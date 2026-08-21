@@ -34,8 +34,8 @@ class OpenMeteoClient {
         httpClient.get("https://api.open-meteo.com/v1/forecast") {
             parameter("latitude", latitude)
             parameter("longitude", longitude)
-            parameter("current", "temperature_2m,weather_code")
-            parameter("daily", "temperature_2m_max,temperature_2m_min,weather_code")
+            parameter("current", "temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m")
+            parameter("daily", "temperature_2m_max,temperature_2m_min,weather_code,sunrise,sunset,precipitation_probability_max,wind_speed_10m_max")
             parameter("forecast_days", forecastDays.coerceIn(1, 16))
             parameter("timezone", "auto")
         }.body<OpenMeteoResponse>()
