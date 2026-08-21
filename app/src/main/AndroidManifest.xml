@@ -17,7 +17,7 @@
         android:theme="@style/Theme.HomeHabit"
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true"
-        tools:replace="android:extractNativeLibs">
+        tools:replace="android:allowBackup,android:label,android:extractNativeLibs">
 
         <activity
             android:name=".MainActivity"

@@ -39,19 +39,24 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.homehabit.app.camera.RtspPlaybackState
 import com.homehabit.app.camera.RtspPlayer
+import com.homehabit.app.camera.RtspPlayerNative
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
+import com.alexvas.rtsp.widget.RtspSurfaceView
 
 @Composable
 fun CameraStreamModal(
     label: String,
     rtspUrl: String,
     posterUrl: String?,
+    useRtspClientNative: Boolean = false,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val player = remember { RtspPlayer(context) }
-    val playbackState by player.state.collectAsState()
+    val playerVlc = remember { if (!useRtspClientNative) RtspPlayer(context) else null }
+    val playerNative = remember { if (useRtspClientNative) RtspPlayerNative() else null }
+    
+    val playbackState by (playerNative?.state ?: playerVlc?.state!!).collectAsState()
 
     // MediaPlayer.Event.Playing signale un changement d'etat interne chez
     // libVLC, mais ne garantit pas qu'une frame ait deja ete rendue a
@@ -63,9 +68,9 @@ fun CameraStreamModal(
     var visuallyReady by remember { mutableStateOf(false) }
     LaunchedEffect(playbackState) {
         if (playbackState == RtspPlaybackState.PLAYING) {
-            // On augmente le délai pour être certain que la première frame
-            // vidéo est bien affichée en dessous avant de masquer le poster.
-            delay(1500)
+            // On augmente le dï¿½lai pour ï¿½tre certain que la premiï¿½re frame
+            // vidï¿½o est bien affichï¿½e en dessous avant de masquer le poster.
+            delay(if (useRtspClientNative) 500 else 1500)
             visuallyReady = true
         } else {
             visuallyReady = false
@@ -75,7 +80,10 @@ fun CameraStreamModal(
     // Liberation systematique du player a la fermeture de la modale
     // (pas de lecture RTSP en arriere-plan).
     DisposableEffect(Unit) {
-        onDispose { player.stopAndRelease() }
+        onDispose { 
+            playerVlc?.stopAndRelease()
+            playerNative?.stopAndRelease()
+        }
     }
 
     Dialog(
@@ -87,7 +95,7 @@ fun CameraStreamModal(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            // 1. Fond statique en COULEUR (évite l'écran noir si la vidéo tarde)
+            // 1. Fond statique en COULEUR (ï¿½vite l'ï¿½cran noir si la vidï¿½o tarde)
             if (posterUrl != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -104,26 +112,40 @@ fun CameraStreamModal(
                 )
             }
 
-            // 2. Flux Vidéo VLC (en TextureView pour supporter l'alpha)
+            // 2. Flux Vidï¿½o VLC (en TextureView pour supporter l'alpha)
             val videoAlpha by animateFloatAsState(
                 targetValue = if (visuallyReady) 1f else 0f,
                 animationSpec = tween(durationMillis = 1000),
                 label = "videoFadeIn"
             )
 
-            AndroidView(
-                factory = { ctx ->
-                    VLCVideoLayout(ctx).also { layout ->
-                        player.attachViews(layout)
-                        player.play(rtspUrl)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(videoAlpha)
-            )
+            if (useRtspClientNative) {
+                AndroidView(
+                    factory = { ctx ->
+                        RtspSurfaceView(ctx).also { view ->
+                            playerNative?.attachView(view)
+                            playerNative?.play(rtspUrl)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(videoAlpha)
+                )
+            } else {
+                AndroidView(
+                    factory = { ctx ->
+                        VLCVideoLayout(ctx).also { layout ->
+                            playerVlc?.attachViews(layout)
+                            playerVlc?.play(rtspUrl)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(videoAlpha)
+                )
+            }
 
-            // 3. Masque d'attente GRISÉ (s'efface quand prêt)
+            // 3. Masque d'attente GRISï¿½ (s'efface quand prï¿½t)
             AnimatedVisibility(
                 visible = !visuallyReady,
                 enter = fadeIn(),

@@ -10,8 +10,8 @@ android {
 
     defaultConfig {
         applicationId = "com.homehabit.app"
-        // Couvre les appareils Android depuis 2018 (Android 6.0+)
-        minSdk = 23
+        // Version 24 requise pour rtsp-client-android (low-latency MediaCodec)
+        minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
@@ -69,6 +69,7 @@ dependencies {
 
     // Camera : flux RTSP (libVLC) + chargement du snapshot poster (Coil)
     implementation("org.videolan.android:libvlc-all:3.7.0")
+    implementation("com.github.alexeyvasilyev:rtsp-client-android:5.3.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
 
     // Icones Font Awesome (a activer a l'etape suivante)

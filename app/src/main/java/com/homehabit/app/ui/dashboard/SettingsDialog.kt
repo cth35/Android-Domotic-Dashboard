@@ -84,6 +84,7 @@ fun SettingsDialog(
     var nightEndHour by remember { mutableStateOf(initial.nightEndHour) }
     var nightBrightnessPercent by remember { mutableStateOf((initial.nightBrightness * 100).roundToInt().coerceIn(1, 100)) }
     var nightScreenOffEnabled by remember { mutableStateOf(initial.nightScreenOffEnabled) }
+    var useRtspClientNative by remember { mutableStateOf(initial.useRtspClientNative) }
     var isAdminActive by remember { mutableStateOf(ScreenPowerController.isDeviceAdminActive(context)) }
 
     val adminLauncher = rememberLauncherForActivityResult(
@@ -268,6 +269,27 @@ fun SettingsDialog(
                     }
 
                     Spacer(Modifier.height(24.dp))
+                    Text(text = "Camera", color = TextPrimary, fontSize = 16.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Options pour le flux RTSP plein ecran.",
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    ToggleRow(
+                        label = "Lecteur basse latence (Experimental)",
+                        checked = useRtspClientNative,
+                        onCheckedChange = { useRtspClientNative = it }
+                    )
+                    Text(
+                        text = "Utilise un client RTSP natif plutot que libVLC. Plus reactif, mais peut etre moins stable sur certains flux.",
+                        color = TextSecondary,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+
+                    Spacer(Modifier.height(24.dp))
                     Text(text = "Gestion des pages", color = TextPrimary, fontSize = 16.sp)
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -357,7 +379,8 @@ fun SettingsDialog(
                                             nightStartHour = nightStartHour,
                                             nightEndHour = nightEndHour,
                                             nightBrightness = (nightBrightnessPercent / 100f).coerceIn(0.01f, 1f),
-                                            nightScreenOffEnabled = nightScreenOffEnabled
+                                            nightScreenOffEnabled = nightScreenOffEnabled,
+                                            useRtspClientNative = useRtspClientNative
                                         )
                                         ScreenPowerController.scheduleAlarms(context, newSettings)
                                         onSave(newSettings)

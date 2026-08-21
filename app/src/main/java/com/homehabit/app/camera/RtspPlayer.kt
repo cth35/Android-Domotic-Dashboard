@@ -55,13 +55,13 @@ class RtspPlayer(context: Context) {
     fun play(rtspUrl: String) {
         _state.value = RtspPlaybackState.CONNECTING
         val media = Media(libVLC, Uri.parse(rtspUrl))
-        // Options de stabilité pour le réseau local
+        // Options de stabilitï¿½ pour le rï¿½seau local
         media.addOption(":network-caching=1500")
         media.addOption(":rtsp-tcp")
         media.addOption(":clock-jitter=0")
         media.addOption(":clock-synchro=0")
         
-        // On garde l'accélération matérielle pour la vidéo plein écran (surface visible)
+        // On garde l'accï¿½lï¿½ration matï¿½rielle pour la vidï¿½o plein ï¿½cran (surface visible)
         media.setHWDecoderEnabled(true, false)
 
         mediaPlayer.media = media

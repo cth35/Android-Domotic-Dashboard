@@ -46,7 +46,12 @@ data class AppSettings(
     // administrateur — voir NightModeSchedule et DeviceAdmin. Desactive
     // par defaut : necessite une action explicite de l'utilisateur pour
     // accorder les droits, ne peut pas s'activer tout seul.
-    val nightScreenOffEnabled: Boolean = false
+    val nightScreenOffEnabled: Boolean = false,
+
+    // --- Lecteur Video ---
+    // Si vrai, utilise rtsp-client-android (plus reactif, faible latence)
+    // au lieu de libVLC (plus stable sur flux difficiles).
+    val useRtspClientNative: Boolean = false
 )
 
 @Serializable
