@@ -1,0 +1,123 @@
+package com.homehabit.app.server
+
+/**
+ * Page d'édition minimale servie sur / : un simple éditeur JSON texte.
+ * Suffisant pour valider le principe (lecture, édition, sauvegarde) ;
+ * un éditeur visuel drag & drop côté navigateur est envisageable plus
+ * tard mais pas nécessaire pour l'instant vu que l'édition tactile
+ * existe déjà directement dans l'app.
+ *
+ * Le token est injecté directement dans le JS (variable TOKEN) pour que
+ * les appels fetch() vers /config portent l'entete Authorization sans
+ * que l'utilisateur ait a le ressaisir a chaque action. Alphabet du
+ * token restreint (voir ConfigRepository.ensureHttpAuthToken) donc pas
+ * de risque d'injection en l'interpolant tel quel ici.
+ */
+fun configEditorHtml(token: String): String = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HomeHabit - Config</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    background: #0b0c0e;
+    color: #f2f2f0;
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+  p.sub { color: #7a7d85; font-size: 12px; margin-top: 0; margin-bottom: 16px; }
+  textarea {
+    width: 100%;
+    height: 60vh;
+    background: #1b1c20;
+    color: #f2f2f0;
+    border: 1px solid #2a2b2f;
+    border-radius: 10px;
+    padding: 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 13px;
+    box-sizing: border-box;
+    resize: vertical;
+  }
+  .actions { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+  button {
+    background: #4a90d9;
+    color: #0b1a2b;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  button.secondary {
+    background: #1b1c20;
+    color: #f2f2f0;
+    border: 1px solid #2a2b2f;
+  }
+  #status { font-size: 12px; color: #7a7d85; }
+  #status.ok { color: #a8d67a; }
+  #status.error { color: #e35b5b; }
+</style>
+</head>
+<body>
+  <h1>Configuration du dashboard</h1>
+  <p class="sub">Modifier le JSON puis "Enregistrer". Rechargé automatiquement sur l'appareil.</p>
+  <textarea id="editor" spellcheck="false"></textarea>
+  <div class="actions">
+    <button onclick="save()">Enregistrer</button>
+    <button class="secondary" onclick="load()">Recharger</button>
+    <span id="status"></span>
+  </div>
+
+<script>
+const TOKEN = "$token";
+
+async function load() {
+  const res = await fetch('/config', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+  if (!res.ok) {
+    setStatus('Non autorise (token invalide ?)', 'error');
+    return;
+  }
+  const text = await res.text();
+  document.getElementById('editor').value = JSON.stringify(JSON.parse(text), null, 2);
+  setStatus('Chargé', 'ok');
+}
+
+async function save() {
+  const value = document.getElementById('editor').value;
+  try {
+    JSON.parse(value);
+  } catch (e) {
+    setStatus('JSON invalide : ' + e.message, 'error');
+    return;
+  }
+  const res = await fetch('/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN },
+    body: value
+  });
+  if (res.ok) {
+    setStatus('Enregistré', 'ok');
+  } else {
+    const err = await res.text();
+    setStatus('Erreur serveur : ' + err, 'error');
+  }
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = cls;
+}
+
+load();
+</script>
+</body>
+</html>
+"""

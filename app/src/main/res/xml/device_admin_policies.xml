@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Politique minimale : uniquement force-lock (necessaire pour
+  DevicePolicyManager.lockNow(), qui eteint/verrouille l'ecran).
+  Aucune autre capacite demandee (pas d'effacement, pas de gestion de
+  mot de passe, etc.) — le principe du moindre privilege.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>

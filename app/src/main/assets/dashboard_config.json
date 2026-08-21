@@ -1,0 +1,216 @@
+{
+  "settings": {
+    "domoticzHost": "192.168.1.10",
+    "domoticzPort": 8080,
+    "domoticzUseHttps": false,
+    "domoticzUsername": null,
+    "domoticzPassword": null
+  },
+  "pages": [
+    {
+      "id": "page_accueil",
+      "name": "Accueil",
+      "grid": {
+        "columns": 4
+      },
+      "widgets": [
+        {
+          "id": "meteo",
+          "type": "weather",
+          "x": 0,
+          "y": 0,
+          "w": 3,
+          "h": 1,
+          "label": "Meteo",
+          "source": {
+            "provider": "open-meteo",
+            "latitude": 48.8566,
+            "longitude": 2.3522
+          }
+        },
+        {
+          "id": "salon_lum",
+          "type": "light",
+          "x": 3,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "label": "Salon",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:12"
+          }
+        },
+        {
+          "id": "cam_jardin",
+          "type": "camera",
+          "x": 2,
+          "y": 1,
+          "w": 2,
+          "h": 2,
+          "label": "Jardin",
+          "source": {
+            "provider": "camera",
+            "url": "http://192.168.1.50/snapshot.jpg",
+            "rtspUrl": "rtsp://192.168.1.50:554/stream1",
+            "refreshSeconds": 15
+          }
+        },
+        {
+          "id": "cuisine_lum",
+          "type": "light",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "label": "Cuisine",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:13"
+          }
+        },
+        {
+          "id": "thermostat_salon",
+          "type": "thermostat",
+          "x": 1,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "label": "Thermostat",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:20"
+          }
+        },
+        {
+          "id": "volet_salon",
+          "type": "shutter",
+          "x": 0,
+          "y": 2,
+          "w": 1,
+          "h": 1,
+          "label": "Volet",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:21"
+          }
+        },
+        {
+          "id": "porte_entree",
+          "type": "lock",
+          "x": 0,
+          "y": 3,
+          "w": 4,
+          "h": 1,
+          "label": "Entree principale",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:30"
+          }
+        },
+        {
+          "id": "salon_hue",
+          "type": "color_light",
+          "x": 1,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "label": "Ambiance salon",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:15"
+          }
+        },
+        {
+          "id": "temp_exterieur",
+          "type": "sensor",
+          "x": 0,
+          "y": 4,
+          "w": 1,
+          "h": 1,
+          "label": "Exterieur",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:16"
+          }
+        },
+        {
+          "id": "scene_soiree",
+          "type": "scene",
+          "x": 1,
+          "y": 4,
+          "w": 1,
+          "h": 1,
+          "label": "Soiree cine",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:40"
+          }
+        },
+        {
+          "id": "prevision_paris",
+          "type": "forecast",
+          "x": 0,
+          "y": 5,
+          "w": 4,
+          "h": 1,
+          "label": "Prevision 7 jours",
+          "source": {
+            "provider": "open-meteo",
+            "latitude": 48.8566,
+            "longitude": 2.3522
+          }
+        }
+      ]
+    },
+    {
+      "id": "page_chambre",
+      "name": "Chambre",
+      "grid": {
+        "columns": 4
+      },
+      "widgets": [
+        {
+          "id": "chambre_lum",
+          "type": "dimmer",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "label": "Chambre",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:14"
+          }
+        },
+        {
+          "id": "chambre_temp",
+          "type": "sensor",
+          "x": 1,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "label": "Temperature",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:17"
+          }
+        },
+        {
+          "id": "volet_chambre",
+          "type": "shutter",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "label": "Volet",
+          "source": {
+            "provider": "domoticz",
+            "deviceId": "idx:22",
+            "shutterStyle": "toggle"
+          }
+        }
+      ]
+    }
+  ]
+}

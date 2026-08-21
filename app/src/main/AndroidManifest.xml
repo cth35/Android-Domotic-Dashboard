@@ -1,0 +1,64 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Necessaire sur Android 12+ pour des alarmes precises (mode nuit,
+         extinction/rallumage reels). Sur certains fabricants, l'utilisateur
+         doit malgre tout l'accorder manuellement (Parametres > Applications
+         > Acces special > Alarmes et rappels) — voir README. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <application
+        android:name=".HomeHabitApp"
+        android:allowBackup="true"
+        android:label="HomeHabit"
+        android:theme="@style/Theme.HomeHabit"
+        android:usesCleartextTraffic="true"
+        android:extractNativeLibs="true"
+        tools:replace="android:extractNativeLibs">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Device Admin (droits minimaux, force-lock uniquement) : necessaire
+             pour l'extinction reelle de l'ecran (DevicePolicyManager.lockNow()).
+             Jamais actif tant que l'utilisateur ne l'a pas explicitement
+             accorde via l'ecran de reglages. -->
+        <receiver
+            android:name=".power.HomeHabitDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_policies" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".power.ScreenAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".power.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

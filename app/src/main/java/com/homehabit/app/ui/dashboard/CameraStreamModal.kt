@@ -1,0 +1,158 @@
+package com.homehabit.app.ui.dashboard
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import com.homehabit.app.camera.RtspPlaybackState
+import com.homehabit.app.camera.RtspPlayer
+import kotlinx.coroutines.delay
+import org.videolan.libvlc.util.VLCVideoLayout
+
+@Composable
+fun CameraStreamModal(
+    label: String,
+    rtspUrl: String,
+    posterUrl: String?,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val player = remember { RtspPlayer(context) }
+    val playbackState by player.state.collectAsState()
+
+    // MediaPlayer.Event.Playing signale un changement d'etat interne chez
+    // libVLC, mais ne garantit pas qu'une frame ait deja ete rendue a
+    // l'ecran (negociation RTSP, attente de keyframe, demarrage du
+    // decodage materiel). Sans ce delai, le fondu peut demarrer avant
+    // qu'il y ait vraiment une image, provoquant un flash noir entre le
+    // poster et le flux. Reinitialise immediatement si l'etat quitte
+    // PLAYING (ex: coupure puis reconnexion).
+    var visuallyReady by remember { mutableStateOf(false) }
+    LaunchedEffect(playbackState) {
+        if (playbackState == RtspPlaybackState.PLAYING) {
+            delay(300)
+            visuallyReady = true
+        } else {
+            visuallyReady = false
+        }
+    }
+
+    // Liberation systematique du player a la fermeture de la modale
+    // (pas de lecture RTSP en arriere-plan).
+    DisposableEffect(Unit) {
+        onDispose { player.stopAndRelease() }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    VLCVideoLayout(ctx).also { layout ->
+                        player.attachViews(layout)
+                        player.play(rtspUrl)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Effet "snapshot noir et blanc" : reste visible tant que le
+            // flux RTSP n'est pas visuellement pret (pas juste "Playing"
+            // signale par libVLC, voir le delai plus haut), puis fondu
+            // vers la video couleur en dessous.
+            AnimatedVisibility(
+                visible = !visuallyReady,
+                exit = fadeOut(animationSpec = tween(durationMillis = 600))
+            ) {
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                    if (posterUrl != null) {
+                        AsyncImage(
+                            model = posterUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }),
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.35f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Filled.Videocam,
+                                contentDescription = null,
+                                tint = Color(0xFFC8C9CC),
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = when (playbackState) {
+                                    RtspPlaybackState.ERROR -> "Flux indisponible"
+                                    else -> "Connexion au flux..."
+                                },
+                                color = Color(0xFFC8C9CC),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            )
+
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = "Fermer", tint = Color.White)
+            }
+        }
+    }
+}
