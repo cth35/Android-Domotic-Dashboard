@@ -8,12 +8,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,6 +23,7 @@ import com.homehabit.app.data.domoticz.DiscoveredDomoticzScene
 import com.homehabit.app.model.WidgetType
 import com.homehabit.app.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddWidgetDialog(
     devices: List<DiscoveredDomoticzDevice>,
@@ -31,12 +32,24 @@ fun AddWidgetDialog(
     onSelectScene: (DiscoveredDomoticzScene) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredDevices = remember(devices, searchQuery) {
+        if (searchQuery.isBlank()) devices
+        else devices.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+
+    val filteredScenes = remember(scenes, searchQuery) {
+        if (searchQuery.isBlank()) scenes
+        else scenes.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
                 .background(SurfaceDark)
-                .heightIn(max = 480.dp)
+                .heightIn(max = 540.dp)
                 .fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -44,47 +57,103 @@ fun AddWidgetDialog(
                     text = "Ajouter un widget",
                     color = TextPrimary,
                     fontSize = 16.sp,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Text(
-                    text = "${devices.size} appareil(s), ${scenes.size} scene(s)/groupe(s) non encore ajoute(s)",
-                    color = TextSecondary,
-                    fontSize = 11.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                if (devices.isEmpty() && scenes.isEmpty()) {
-                    Text(
-                        text = "Rien de nouveau trouve sur le serveur Domoticz.",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Rechercher un appareil...", color = TextMuted, fontSize = 13.sp) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentBlue,
+                        unfocusedBorderColor = Color.Transparent,
+                        cursorColor = AccentBlue,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedContainerColor = SurfaceVariantDark,
+                        unfocusedContainerColor = SurfaceVariantDark
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Effacer", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                )
+
+                if (filteredDevices.isEmpty() && filteredScenes.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (searchQuery.isBlank()) "Rien de nouveau trouve." else "Aucun resultat pour \"$searchQuery\"",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
                 } else {
-                    LazyColumn {
-                        if (scenes.isNotEmpty()) {
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        item {
+                            Text(
+                                text = "Systeme",
+                                color = TextSecondary,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { 
+                                        onSelect(DiscoveredDomoticzDevice(
+                                            idx = "system_clock",
+                                            name = "Horloge",
+                                            widgetType = WidgetType.CLOCK,
+                                            raw = com.homehabit.app.data.domoticz.DomoticzDeviceDto(idx = "0")
+                                        ))
+                                    }
+                                    .padding(vertical = 10.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(Icons.Default.Schedule, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = "Horloge & Date", color = TextPrimary, fontSize = 13.sp)
+                                    Text(text = "Affiche l'heure et la date actuelle", color = TextSecondary, fontSize = 10.sp)
+                                }
+                                Icon(Icons.Filled.Add, contentDescription = "Ajouter", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        if (filteredScenes.isNotEmpty()) {
                             item {
                                 Text(
-                                    text = "Scenes & groupes",
+                                    text = "Scenes & groupes (${filteredScenes.size})",
                                     color = TextSecondary,
                                     fontSize = 10.sp,
                                     modifier = Modifier.padding(vertical = 6.dp)
                                 )
                             }
-                            items(scenes, key = { "scene_${it.idx}" }) { scene ->
+                            items(filteredScenes, key = { "scene_${it.idx}" }) { scene ->
                                 SceneRow(scene = scene, onClick = { onSelectScene(scene) })
                             }
                         }
 
-                        if (devices.isNotEmpty()) {
+                        if (filteredDevices.isNotEmpty()) {
                             item {
                                 Text(
-                                    text = "Appareils",
+                                    text = "Appareils (${filteredDevices.size})",
                                     color = TextSecondary,
                                     fontSize = 10.sp,
                                     modifier = Modifier.padding(vertical = 6.dp)
                                 )
                             }
-                            items(devices, key = { "device_${it.idx}" }) { device ->
+                            items(filteredDevices, key = { "device_${it.idx}" }) { device ->
                                 DeviceRow(device = device, onClick = { onSelect(device) })
                             }
                         }
@@ -151,6 +220,7 @@ private fun iconFor(type: WidgetType): ImageVector = when (type) {
     WidgetType.COLOR_LIGHT -> Icons.Filled.Palette
     WidgetType.SENSOR -> Icons.Filled.Info
     WidgetType.SCENE -> Icons.Filled.AutoAwesome
+    WidgetType.CLOCK -> Icons.Default.Schedule
     else -> Icons.Filled.QuestionMark
 }
 
@@ -164,6 +234,7 @@ private fun colorFor(type: WidgetType): androidx.compose.ui.graphics.Color = whe
     WidgetType.SENSOR -> AccentBlue
     WidgetType.SCENE -> AccentGreen
     WidgetType.FORECAST -> AccentBlue
+    WidgetType.CLOCK -> AccentBlue
     else -> TextMuted
 }
 
@@ -179,5 +250,6 @@ private fun labelFor(type: WidgetType): String = when (type) {
     WidgetType.FORECAST -> "Prevision 7 jours"
     WidgetType.SENSOR -> "Capteur (temp, humidite, etc.)"
     WidgetType.SCENE -> "Scene / groupe"
+    WidgetType.CLOCK -> "Horloge"
     else -> "Type non reconnu — a verifier"
 }

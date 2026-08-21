@@ -37,19 +37,21 @@ import kotlin.coroutines.resume
  */
 class RtspThumbnailGrabber(private val context: Context) {
 
-    suspend fun capture(rtspUrl: String, timeoutMs: Long = 6_000L): Bitmap? =
+    suspend fun capture(rtspUrl: String, timeoutMs: Long = 8_000L): Bitmap? =
         suspendCancellableCoroutine { continuation ->
-            val libVLC = LibVLC(context, arrayListOf("--no-audio", "--rtsp-tcp"))
+            val libVLC = LibVLC(context, arrayListOf("--no-audio"))
             val mediaPlayer = MediaPlayer(libVLC)
             val layout = VLCVideoLayout(context)
             val handler = Handler(Looper.getMainLooper())
             var resolved = false
 
             fun cleanup() {
-                runCatching { mediaPlayer.stop() }
-                runCatching { mediaPlayer.detachViews() }
-                runCatching { mediaPlayer.release() }
-                runCatching { libVLC.release() }
+                runCatching {
+                    mediaPlayer.stop()
+                    mediaPlayer.detachViews()
+                    mediaPlayer.release()
+                    libVLC.release()
+                }
             }
 
             fun finish(bitmap: Bitmap?) {
@@ -81,6 +83,14 @@ class RtspThumbnailGrabber(private val context: Context) {
 
             mediaPlayer.attachViews(layout, null, false, false)
             val media = Media(libVLC, Uri.parse(rtspUrl))
+            // IMPORTANT: Désactivation matérielle pour éviter "FrameInsert open fail"
+            // sur Mediatek/Unisoc lors d'une capture hors-écran.
+            media.setHWDecoderEnabled(false, false)
+            media.addOption(":network-caching=1500")
+            media.addOption(":rtsp-tcp")
+            media.addOption(":clock-jitter=0")
+            media.addOption(":clock-synchro=0")
+
             mediaPlayer.media = media
             media.release()
             mediaPlayer.play()

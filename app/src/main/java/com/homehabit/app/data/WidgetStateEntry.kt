@@ -8,5 +8,6 @@ package com.homehabit.app.data
  */
 data class WidgetStateEntry(
     val state: WidgetLiveState,
-    val lastUpdate: Long
+    val lastUpdate: Long,
+    val fallbackName: String? = null
 )

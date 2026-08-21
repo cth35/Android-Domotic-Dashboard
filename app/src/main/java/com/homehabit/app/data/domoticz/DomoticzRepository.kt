@@ -37,35 +37,59 @@ class DomoticzRepository(private val client: DomoticzClient) {
         val sceneWidgets = domoticzWidgets.filter { it.widgetType == WidgetType.SCENE }
         val deviceWidgets = domoticzWidgets.filter { it.widgetType != WidgetType.SCENE }
 
+        val lastStates = mutableMapOf<String, WidgetStateEntry>()
+
         while (true) {
-            val states = mutableMapOf<String, WidgetStateEntry>()
+            try {
+                var anyUpdate = false
 
-            for (widget in deviceWidgets) {
-                val idx = extractIdx(widget) ?: continue
-                val device = client.getDevice(idx) ?: continue
-                states[widget.id] = WidgetStateEntry(
-                    state = mapDeviceToState(widget.widgetType, device),
-                    lastUpdate = parseDomoticzLastUpdate(device.LastUpdate)
-                )
-            }
-
-            if (sceneWidgets.isNotEmpty()) {
-                val scenes = client.getScenes()
-                for (widget in sceneWidgets) {
-                    val idx = extractIdx(widget) ?: continue
-                    val scene = scenes.firstOrNull { it.idx == idx } ?: continue
-                    states[widget.id] = WidgetStateEntry(
-                        state = WidgetLiveState.Scene(
-                            isGroup = scene.Type.equals("Group", ignoreCase = true),
-                            isOn = scene.Status.equals("On", ignoreCase = true)
-                        ),
-                        lastUpdate = parseDomoticzLastUpdate(scene.LastUpdate)
-                    )
+                if (deviceWidgets.isNotEmpty()) {
+                    val allDevices = client.getUsedDevices()
+                    for (widget in deviceWidgets) {
+                        val idx = extractIdx(widget) ?: continue
+                        // On cherche dans le bulk, sinon fallback individuel (pour les devices "unused")
+                        val device = allDevices.firstOrNull { it.idx == idx } ?: client.getDevice(idx)
+                        
+                        if (device != null) {
+                            lastStates[widget.id] = WidgetStateEntry(
+                                state = mapDeviceToState(widget.widgetType, device),
+                                lastUpdate = parseDomoticzLastUpdate(device.LastUpdate),
+                                fallbackName = device.Name
+                            )
+                            anyUpdate = true
+                        }
+                    }
                 }
-            }
 
-            emit(states)
-            delay(pollIntervalMs)
+                if (sceneWidgets.isNotEmpty()) {
+                    val scenes = client.getScenes()
+                    for (widget in sceneWidgets) {
+                        val idx = extractIdx(widget) ?: continue
+                        val scene = scenes.firstOrNull { it.idx == idx }
+                        if (scene != null) {
+                            lastStates[widget.id] = WidgetStateEntry(
+                                state = WidgetLiveState.Scene(
+                                    isGroup = scene.Type.equals("Group", ignoreCase = true),
+                                    isOn = scene.Status.equals("On", ignoreCase = true)
+                                ),
+                                lastUpdate = parseDomoticzLastUpdate(scene.LastUpdate),
+                                fallbackName = scene.Name
+                            )
+                            anyUpdate = true
+                        }
+                    }
+                }
+
+                if (anyUpdate || lastStates.isNotEmpty()) {
+                    emit(lastStates.toMap())
+                }
+            } catch (e: Exception) {
+                // En cas d'erreur (timeout, reseau), on garde les derniers etats
+                // connus et on retentera au prochain cycle sans tuer le Flow.
+            }
+            
+            val jitter = (0..500).random().toLong()
+            delay(pollIntervalMs + jitter)
         }
     }
 
@@ -144,7 +168,20 @@ class DomoticzRepository(private val client: DomoticzClient) {
      */
     suspend fun fetchTemperatureSparkline(widget: WidgetConfig, maxPoints: Int = 48): List<Float>? {
         val idx = extractIdx(widget) ?: return null
-        val points = client.getTempGraphDay(idx) ?: return null
+        val rawPoints = client.getTempGraphDay(idx) ?: return null
+        
+        val now = System.currentTimeMillis()
+        val twentyFourHoursAgo = now - (24 * 3600 * 1000)
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+
+        // On ne garde que les points des dernieres 24h reels
+        val points = rawPoints.filter {
+            val time = runCatching { dateFormat.parse(it.d ?: "")?.time }.getOrNull()
+            // Si le parsing echoue, on garde le point par securite, sinon on verifie les 24h
+            if (time == null) true else time >= twentyFourHoursAgo
+        }.mapNotNull { it.te?.toFloatOrNull() }
+
+        if (points.isEmpty()) return null
         if (points.size <= maxPoints) return points
 
         val step = (points.size / maxPoints).coerceAtLeast(1)
@@ -170,11 +207,19 @@ class DomoticzRepository(private val client: DomoticzClient) {
 
     private fun mapDeviceToState(type: WidgetType, device: DomoticzDeviceDto): WidgetLiveState =
         when (type) {
-            WidgetType.LIGHT, WidgetType.DIMMER, WidgetType.COLOR_LIGHT -> WidgetLiveState.Light(
-                isOn = device.Status?.equals("On", ignoreCase = true) == true,
-                brightness = if (type != WidgetType.LIGHT) device.Level else null,
-                colorHex = if (type == WidgetType.COLOR_LIGHT) DomoticzColorParser.parseToHex(device.Color) else null
-            )
+            WidgetType.LIGHT, WidgetType.DIMMER, WidgetType.COLOR_LIGHT -> {
+                val status = device.Status.orEmpty()
+                // Une lumiere est allumee si son statut n'est pas explicitement "Off"
+                // et qu'elle a un statut connu. On evite de se baser uniquement sur Level 
+                // car Domoticz garde souvent le dernier niveau en memoire meme eteint.
+                val isOn = !status.equals("Off", ignoreCase = true) && status.isNotBlank()
+
+                WidgetLiveState.Light(
+                    isOn = isOn,
+                    brightness = if (type != WidgetType.LIGHT) device.Level else null,
+                    colorHex = if (type == WidgetType.COLOR_LIGHT) DomoticzColorParser.parseToHex(device.Color) else null
+                )
+            }
 
             WidgetType.THERMOSTAT -> WidgetLiveState.Thermostat(
                 temperature = (device.Temp ?: device.SetPoint ?: 0.0).toFloat()
@@ -192,6 +237,18 @@ class DomoticzRepository(private val client: DomoticzClient) {
             )
 
             WidgetType.SENSOR -> mapSensorState(device)
+
+            WidgetType.BINARY_SENSOR -> {
+                val status = device.Status.orEmpty()
+                WidgetLiveState.BinarySensor(
+                    isOn = status.startsWith("On", ignoreCase = true) ||
+                        status.startsWith("Open", ignoreCase = true) ||
+                        status.startsWith("Motion", ignoreCase = true),
+                    isContact = device.SwitchType?.contains("Contact", ignoreCase = true) == true ||
+                        device.Name?.contains("Porte", ignoreCase = true) == true ||
+                        device.Name?.contains("Fenetre", ignoreCase = true) == true
+                )
+            }
 
             else -> WidgetLiveState.Empty
         }
@@ -222,7 +279,7 @@ class DomoticzRepository(private val client: DomoticzClient) {
 
         val gaugePercent = when (kind) {
             SensorKind.HUMIDITY, SensorKind.PERCENTAGE ->
-                (device.Humidity ?: device.Level)?.let { (it / 100f).coerceIn(0f, 1f) }
+                (device.Humidity ?: device.Level?.toDouble())?.let { (it.toFloat() / 100f).coerceIn(0f, 1f) }
             else -> null
         }
 

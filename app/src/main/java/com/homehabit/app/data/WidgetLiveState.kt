@@ -41,6 +41,11 @@ sealed class WidgetLiveState {
         val gaugePercent: Float? = null
     ) : WidgetLiveState()
 
+    data class BinarySensor(
+        val isOn: Boolean,
+        val isContact: Boolean = false
+    ) : WidgetLiveState()
+
     /**
      * Scene ou groupe Domoticz declenche en un tap. isGroup distingue les
      * deux : un Group a un vrai etat on/off togglable, une Scene est un

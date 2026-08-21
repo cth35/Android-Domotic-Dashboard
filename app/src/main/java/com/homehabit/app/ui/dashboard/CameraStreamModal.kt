@@ -1,7 +1,9 @@
 package com.homehabit.app.ui.dashboard
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -21,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -32,6 +35,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.homehabit.app.camera.RtspPlaybackState
 import com.homehabit.app.camera.RtspPlayer
 import kotlinx.coroutines.delay
@@ -58,7 +63,9 @@ fun CameraStreamModal(
     var visuallyReady by remember { mutableStateOf(false) }
     LaunchedEffect(playbackState) {
         if (playbackState == RtspPlaybackState.PLAYING) {
-            delay(300)
+            // On augmente le délai pour être certain que la première frame
+            // vidéo est bien affichée en dessous avant de masquer le poster.
+            delay(1500)
             visuallyReady = true
         } else {
             visuallyReady = false
@@ -80,6 +87,30 @@ fun CameraStreamModal(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
+            // 1. Fond statique en COULEUR (évite l'écran noir si la vidéo tarde)
+            if (posterUrl != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(posterUrl)
+                        .memoryCacheKey(posterUrl)
+                        .diskCacheKey(posterUrl)
+                        .placeholderMemoryCacheKey(posterUrl)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .crossfade(false)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            // 2. Flux Vidéo VLC (en TextureView pour supporter l'alpha)
+            val videoAlpha by animateFloatAsState(
+                targetValue = if (visuallyReady) 1f else 0f,
+                animationSpec = tween(durationMillis = 1000),
+                label = "videoFadeIn"
+            )
+
             AndroidView(
                 factory = { ctx ->
                     VLCVideoLayout(ctx).also { layout ->
@@ -87,23 +118,30 @@ fun CameraStreamModal(
                         player.play(rtspUrl)
                     }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(videoAlpha)
             )
 
-            // Effet "snapshot noir et blanc" : reste visible tant que le
-            // flux RTSP n'est pas visuellement pret (pas juste "Playing"
-            // signale par libVLC, voir le delai plus haut), puis fondu
-            // vers la video couleur en dessous.
+            // 3. Masque d'attente GRISÉ (s'efface quand prêt)
             AnimatedVisibility(
                 visible = !visuallyReady,
-                exit = fadeOut(animationSpec = tween(durationMillis = 600))
+                enter = fadeIn(),
+                exit = fadeOut(animationSpec = tween(durationMillis = 1000))
             ) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                     if (posterUrl != null) {
                         AsyncImage(
-                            model = posterUrl,
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(posterUrl)
+                                .memoryCacheKey(posterUrl)
+                                .diskCacheKey(posterUrl)
+                                .placeholderMemoryCacheKey(posterUrl)
+                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                .crossfade(false)
+                                .build(),
                             contentDescription = null,
-                            contentScale = ContentScale.Crop,
+                            contentScale = ContentScale.Fit,
                             colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }),
                             modifier = Modifier.fillMaxSize()
                         )
@@ -112,7 +150,7 @@ fun CameraStreamModal(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.35f)),
+                            .background(Color.Black.copy(alpha = 0.4f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {

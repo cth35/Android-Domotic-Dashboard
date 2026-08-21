@@ -59,7 +59,8 @@ data class DashboardPage(
 
 @Serializable
 data class GridConfig(
-    val columns: Int = 4
+    val columns: Int = 6,
+    val rows: Int = 0 // 0 = mode scroll (hauteur libre), > 0 = mode fit (nombre fixe de lignes)
 )
 
 @Serializable
@@ -85,5 +86,6 @@ data class WidgetSource(
     val refreshSeconds: Int? = null,    // frequence de rafraichissement du snapshot
     val latitude: Double? = null,       // widget meteo (Open-Meteo travaille en lat/lon)
     val longitude: Double? = null,
-    val shutterStyle: String? = null    // "buttons" (defaut) ou "toggle", widget SHUTTER uniquement
+    val shutterStyle: String? = null,   // "buttons" (defaut) ou "toggle", widget SHUTTER uniquement
+    val imageScale: String? = null      // "crop" (par defaut) ou "fit", widget CAMERA uniquement
 )

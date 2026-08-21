@@ -1,11 +1,15 @@
 package com.homehabit.app.ui.dashboard
 
-import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -22,24 +26,14 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -58,12 +52,14 @@ import com.homehabit.app.ui.theme.BackgroundDark
 import com.homehabit.app.ui.theme.SurfaceDark
 import com.homehabit.app.ui.theme.TextPrimary
 import com.homehabit.app.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private val WIDGET_GAP = 8.dp
 private val HANDLE_SIZE = 22.dp
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(viewModel: DashboardViewModel) {
     val config by viewModel.config.collectAsState()
@@ -81,6 +77,22 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     var lightModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var managePageIndex by remember { mutableStateOf<Int?>(null) }
 
+    // Gestion de l'affichage automatique des controles (Auto-hide)
+    var controlsVisible by remember { mutableStateOf(false) }
+    var lastInteractionTime by remember { mutableLongStateOf(0L) }
+
+    fun pokeControls() {
+        controlsVisible = true
+        lastInteractionTime = System.currentTimeMillis()
+    }
+
+    LaunchedEffect(controlsVisible, lastInteractionTime, isEditMode) {
+        if (controlsVisible && !isEditMode) {
+            delay(5000)
+            controlsVisible = false
+        }
+    }
+
     val pagerState = rememberPagerState(pageCount = { pages.size.coerceAtLeast(1) })
     val scope = rememberCoroutineScope()
 
@@ -92,14 +104,16 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            PageTabsBar(
-                pages = pages,
-                currentPage = pagerState.currentPage.coerceIn(0, pages.lastIndex.coerceAtLeast(0)),
-                isEditMode = isEditMode,
-                onPageSelected = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
-                onPageLongPress = { index -> managePageIndex = index },
-                onAddPage = { viewModel.addPage() }
-            )
+            if (isEditMode) {
+                PageTabsBar(
+                    pages = pages,
+                    currentPage = pagerState.currentPage.coerceIn(0, pages.lastIndex.coerceAtLeast(0)),
+                    isEditMode = isEditMode,
+                    onPageSelected = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
+                    onPageLongPress = { index -> managePageIndex = index },
+                    onAddPage = { viewModel.addPage() }
+                )
+            }
 
             if (pages.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().background(BackgroundDark))
@@ -116,7 +130,8 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                         isEditMode = isEditMode,
                         onResizeUpdate = viewModel::updateWidgetRect,
                         onMoveCommit = viewModel::applyLayout,
-                        onDeleteWidget = viewModel::removeWidget
+                        onDeleteWidget = viewModel::removeWidget,
+                        onBackgroundClick = ::pokeControls
                     ) { widgetConfig ->
                         val isDimmableLight = widgetConfig.widgetType == WidgetType.DIMMER ||
                             widgetConfig.widgetType == WidgetType.COLOR_LIGHT
@@ -140,13 +155,14 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                                     { { viewModel.toggleLock(widgetConfig.id) } }
                                 widgetConfig.widgetType == WidgetType.SCENE ->
                                     { { viewModel.triggerScene(widgetConfig.id) } }
+                                widgetConfig.widgetType == WidgetType.BINARY_SENSOR -> null
                                 widgetConfig.widgetType == WidgetType.THERMOSTAT ->
                                     { { thermostatModalWidget = widgetConfig } }
                                 widgetConfig.widgetType == WidgetType.CAMERA && widgetConfig.source?.rtspUrl != null ->
                                     { { cameraModalWidget = widgetConfig } }
                                 else -> null
                             },
-                            onLongClick = if (!isEditMode && isDimmableLight) {
+                            onLongClick = if (!isEditMode && (isDimmableLight || widgetConfig.widgetType == WidgetType.LIGHT)) {
                                 { lightModalWidget = widgetConfig }
                             } else null,
                             onShutterOpen = if (!isEditMode && isButtonsShutter) {
@@ -164,58 +180,58 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
             }
         }
 
-        FloatingActionButton(
-            onClick = { viewModel.toggleEditMode() },
-            containerColor = if (isEditMode) AccentBlue else SurfaceDark,
-            contentColor = TextPrimary,
-            shape = CircleShape,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(20.dp)
-                .size(44.dp)
+        AnimatedVisibility(
+            visible = controlsVisible || isEditMode,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopEnd)
         ) {
-            Icon(
-                imageVector = if (isEditMode) Icons.Filled.Check else Icons.Filled.Edit,
-                contentDescription = if (isEditMode) "Terminer l'edition" else "Mode edition"
-            )
-        }
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                FloatingActionButton(
+                    onClick = { 
+                        viewModel.toggleEditMode()
+                        if (!isEditMode) pokeControls() // S'assure qu'ils restent visibles au debut
+                    },
+                    containerColor = if (isEditMode) AccentBlue else SurfaceDark,
+                    contentColor = TextPrimary,
+                    shape = CircleShape,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isEditMode) Icons.Filled.Check else Icons.Filled.Edit,
+                        contentDescription = if (isEditMode) "Terminer l'edition" else "Mode edition"
+                    )
+                }
 
-        FloatingActionButton(
-            onClick = { showSettingsDialog = true },
-            containerColor = SurfaceDark,
-            contentColor = TextSecondary,
-            shape = CircleShape,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 76.dp, end = 20.dp)
-                .size(44.dp)
-        ) {
-            Icon(Icons.Filled.Settings, contentDescription = "Reglages")
+                if (!isEditMode) {
+                    FloatingActionButton(
+                        onClick = { showSettingsDialog = true },
+                        containerColor = SurfaceDark,
+                        contentColor = TextSecondary,
+                        shape = CircleShape,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Reglages")
+                    }
+                } else {
+                    FloatingActionButton(
+                        onClick = { viewModel.cancelEditMode() },
+                        containerColor = AccentRed,
+                        contentColor = TextPrimary,
+                        shape = CircleShape,
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Icon(Icons.Filled.Close, contentDescription = "Annuler")
+                    }
+                }
+            }
         }
 
         if (isEditMode) {
-            val context = LocalContext.current
-            val clipboardManager = LocalClipboardManager.current
-            val fullUrl = remember(config.settings.httpAuthToken) {
-                "http://${NetworkUtils.getLocalIpAddress() ?: "?"}:8090/?token=${config.settings.httpAuthToken}"
-            }
-
-            Text(
-                text = fullUrl,
-                color = TextSecondary,
-                fontSize = 11.sp,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(20.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(SurfaceDark)
-                    .clickable {
-                        clipboardManager.setText(AnnotatedString(fullUrl))
-                        Toast.makeText(context, "URL copiee", Toast.LENGTH_SHORT).show()
-                    }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            )
-
             FloatingActionButton(
                 onClick = {
                     viewModel.discoverDomoticzDevices()
@@ -252,6 +268,9 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     if (showSettingsDialog) {
         SettingsDialog(
             initial = config.settings,
+            pages = pages,
+            onManagePage = { index -> managePageIndex = index },
+            onAddPage = { viewModel.addPage() },
             onSave = { settings ->
                 viewModel.updateDomoticzSettings(settings)
                 showSettingsDialog = false
@@ -298,7 +317,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
         )
     }
 
-    manageDialogHost(pageIndex = managePageIndex, pages = pages, viewModel = viewModel) {
+    ManageDialogHost(pageIndex = managePageIndex, pages = pages, viewModel = viewModel) {
         managePageIndex = null
     }
 }
@@ -309,7 +328,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
  * sur un onglet).
  */
 @Composable
-private fun manageDialogHost(
+private fun ManageDialogHost(
     pageIndex: Int?,
     pages: List<DashboardPage>,
     viewModel: DashboardViewModel,
@@ -320,9 +339,10 @@ private fun manageDialogHost(
 
     PageManageDialog(
         currentName = page.name,
+        currentGrid = page.grid,
         canDelete = pages.size > 1,
-        onRename = { newName ->
-            viewModel.renamePage(index, newName)
+        onSave = { newName, newGrid ->
+            viewModel.updatePageConfig(index, newName, newGrid)
             onDismiss()
         },
         onDelete = {
@@ -356,11 +376,21 @@ private fun DashboardGrid(
     onResizeUpdate: (String, GridEngine.Rect) -> Unit,
     onMoveCommit: (Map<String, GridEngine.Rect>) -> Unit,
     onDeleteWidget: (String) -> Unit,
+    onBackgroundClick: () -> Unit,
     content: @Composable (widget: WidgetConfig) -> Unit
 ) {
     val density = LocalDensity.current
-    var containerWidthPx by remember { mutableStateOf(0) }
+    var containerWidthPx by remember { mutableIntStateOf(0) }
+    var containerHeightPx by remember { mutableIntStateOf(0) }
     var dragState by remember { mutableStateOf<DragUiState?>(null) }
+
+    // Si on quitte le mode édition, on force le reset du drag state local
+    // pour éviter que des widgets ne restent grisés (alpha 0.6).
+    LaunchedEffect(isEditMode) {
+        if (!isEditMode) {
+            dragState = null
+        }
+    }
 
     val columns = gridConfig.columns.coerceAtLeast(1)
     val gapPx = with(density) { WIDGET_GAP.toPx() }
@@ -369,21 +399,39 @@ private fun DashboardGrid(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
-            .onSizeChanged { containerWidthPx = it.width }
             .padding(12.dp)
+            .onSizeChanged { 
+                containerWidthPx = it.width
+                containerHeightPx = it.height
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onBackgroundClick() })
+            }
     ) {
-        if (containerWidthPx == 0) return@Box
+        if (containerWidthPx == 0 || containerHeightPx == 0) return@Box
 
         val cellPx = (containerWidthPx - gapPx * (columns - 1)) / columns
         val cellStepPx = cellPx + gapPx
 
-        val maxRow = (widgets.maxOfOrNull { it.y + it.h } ?: 0) +
-            (dragState?.let { 4 } ?: 0) // marge visuelle pendant qu'on pousse vers le bas
-        val totalHeightDp = with(density) { (cellStepPx * maxRow).toDp() }
+        val isFitMode = gridConfig.rows > 0
+        val rows = if (isFitMode) gridConfig.rows else 0
+        
+        // En mode Fit, on calcule la hauteur de cellule pour que tout tienne
+        val cellHeightPx = if (isFitMode) {
+            (containerHeightPx - gapPx * (rows - 1)) / rows
+        } else {
+            cellPx // Carré par défaut en mode scroll
+        }
+        val cellHeightStepPx = cellHeightPx + gapPx
+
+        val maxRow = if (isFitMode) rows else {
+            (widgets.maxOfOrNull { it.y + it.h } ?: 0) + (dragState?.let { 4 } ?: 0)
+        }
+        val totalHeightDp = with(density) { (cellHeightStepPx * maxRow).toDp() }
 
         Box(
             modifier = Modifier
-                .verticalScroll(rememberScrollState())
+                .let { if (isFitMode) it else it.verticalScroll(rememberScrollState()) }
                 .fillMaxWidth()
                 .height(totalHeightDp)
         ) {
@@ -398,12 +446,12 @@ private fun DashboardGrid(
             widgets.forEach { widget ->
                 val isBeingDragged = dragState?.draggedId == widget.id
                 val widthDp = with(density) { (cellPx * widget.w + gapPx * (widget.w - 1)).toDp() }
-                val heightDp = with(density) { (cellPx * widget.h + gapPx * (widget.h - 1)).toDp() }
+                val heightDp = with(density) { (cellHeightPx * widget.h + gapPx * (widget.h - 1)).toDp() }
 
                 if (isBeingDragged) {
-                    // Suit le doigt sans lag : position d'origine + delta brut, pas d'animation.
+                    // Suit le doigt sans lag
                     val committedOffsetX = with(density) { (cellStepPx * widget.x).toDp() }
-                    val committedOffsetY = with(density) { (cellStepPx * widget.y).toDp() }
+                    val committedOffsetY = with(density) { (cellHeightStepPx * widget.y).toDp() }
                     val rawOffsetX = with(density) { dragState!!.rawOffsetPx.x.toDp() }
                     val rawOffsetY = with(density) { dragState!!.rawOffsetPx.y.toDp() }
 
@@ -415,28 +463,31 @@ private fun DashboardGrid(
                             .alpha(0.6f)
                     ) {
                         content(widget)
-                        EditOverlay(
-                            widget = widget,
-                            allWidgets = widgets,
-                            columns = columns,
-                            cellStepPx = cellStepPx,
-                            onMovePreview = { preview, rawPx ->
-                                dragState = DragUiState(widget.id, preview, rawPx)
-                            },
-                            onMoveCommit = { preview ->
-                                onMoveCommit(preview)
-                                dragState = null
-                            },
-                            onMoveCancel = { dragState = null },
-                            onResizeUpdate = onResizeUpdate,
-                            onDelete = { onDeleteWidget(widget.id) }
-                        )
+                        if (isEditMode) {
+                            EditOverlay(
+                                widget = widget,
+                                allWidgets = widgets,
+                                columns = columns,
+                                cellStepPx = cellStepPx,
+                                cellHeightStepPx = cellHeightStepPx,
+                                onMovePreview = { preview, rawPx ->
+                                    dragState = DragUiState(widget.id, preview, rawPx)
+                                },
+                                onMoveCommit = { preview ->
+                                    onMoveCommit(preview)
+                                    dragState = null
+                                },
+                                onMoveCancel = { dragState = null },
+                                onResizeUpdate = onResizeUpdate,
+                                onDelete = { onDeleteWidget(widget.id) }
+                            )
+                        }
                     }
                 } else {
                     val targetRect = dragState?.preview?.get(widget.id)
                         ?: GridEngine.Rect(widget.x, widget.y, widget.w, widget.h)
                     val targetOffsetX = with(density) { (cellStepPx * targetRect.x).toDp() }
-                    val targetOffsetY = with(density) { (cellStepPx * targetRect.y).toDp() }
+                    val targetOffsetY = with(density) { (cellHeightStepPx * targetRect.y).toDp() }
                     val animatedOffsetX by animateDpAsState(targetOffsetX, label = "widgetOffsetX")
                     val animatedOffsetY by animateDpAsState(targetOffsetY, label = "widgetOffsetY")
 
@@ -453,6 +504,7 @@ private fun DashboardGrid(
                                 allWidgets = widgets,
                                 columns = columns,
                                 cellStepPx = cellStepPx,
+                                cellHeightStepPx = cellHeightStepPx,
                                 onMovePreview = { preview, rawPx ->
                                     dragState = DragUiState(widget.id, preview, rawPx)
                                 },
@@ -499,6 +551,7 @@ private fun EditOverlay(
     allWidgets: List<WidgetConfig>,
     columns: Int,
     cellStepPx: Float,
+    cellHeightStepPx: Float,
     onMovePreview: (Map<String, GridEngine.Rect>, Offset) -> Unit,
     onMoveCommit: (Map<String, GridEngine.Rect>) -> Unit,
     onMoveCancel: () -> Unit,
@@ -508,112 +561,114 @@ private fun EditOverlay(
     val latestWidget = rememberUpdatedState(widget)
     val latestAllWidgets = rememberUpdatedState(allWidgets)
 
-    var startX by remember { mutableStateOf(0) }
-    var startY by remember { mutableStateOf(0) }
-    var moveAccum by remember { mutableStateOf(Offset.Zero) }
-    var lastPreview by remember { mutableStateOf<Map<String, GridEngine.Rect>?>(null) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        var startX by remember { mutableIntStateOf(0) }
+        var startY by remember { mutableIntStateOf(0) }
+        var moveAccum by remember { mutableStateOf(Offset.Zero) }
+        var lastPreview by remember { mutableStateOf<Map<String, GridEngine.Rect>?>(null) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .border(1.5.dp, AccentBlue.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
-            .pointerInput(widget.id) {
-                detectDragGestures(
-                    onDragStart = {
-                        startX = latestWidget.value.x
-                        startY = latestWidget.value.y
-                        moveAccum = Offset.Zero
-                        lastPreview = null
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        moveAccum += dragAmount
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(1.5.dp, AccentBlue.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
+                .pointerInput(widget.id) {
+                    detectDragGestures(
+                        onDragStart = {
+                            startX = latestWidget.value.x
+                            startY = latestWidget.value.y
+                            moveAccum = Offset.Zero
+                            lastPreview = null
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            moveAccum += dragAmount
 
-                        val deltaCellX = (moveAccum.x / cellStepPx).roundToInt()
-                        val deltaCellY = (moveAccum.y / cellStepPx).roundToInt()
-                        val current = latestWidget.value
-                        val candidate = GridEngine.Rect(
-                            startX + deltaCellX,
-                            startY + deltaCellY,
-                            current.w,
-                            current.h
-                        )
-
-                        val preview = GridEngine.resolvePushLayout(
-                            draggedId = widget.id,
-                            candidate = candidate,
-                            allWidgets = latestAllWidgets.value,
-                            columns = columns
-                        )
-                        lastPreview = preview
-                        onMovePreview(preview, moveAccum)
-                    },
-                    onDragEnd = {
-                        lastPreview?.let { onMoveCommit(it) } ?: onMoveCancel()
-                    },
-                    onDragCancel = {
-                        onMoveCancel()
-                    }
-                )
-            }
-    )
-
-    var startW by remember { mutableStateOf(0) }
-    var startH by remember { mutableStateOf(0) }
-    var resizeAccum by remember { mutableStateOf(Offset.Zero) }
-
-    Box(
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(4.dp)
-            .size(HANDLE_SIZE)
-            .clip(CircleShape)
-            .background(AccentBlue)
-            .pointerInput(widget.id) {
-                detectDragGestures(
-                    onDragStart = {
-                        startW = latestWidget.value.w
-                        startH = latestWidget.value.h
-                        resizeAccum = Offset.Zero
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        resizeAccum += dragAmount
-                        val deltaCellW = (resizeAccum.x / cellStepPx).roundToInt()
-                        val deltaCellH = (resizeAccum.y / cellStepPx).roundToInt()
-                        val current = latestWidget.value
-                        onResizeUpdate(
-                            widget.id,
-                            GridEngine.Rect(
-                                current.x,
-                                current.y,
-                                (startW + deltaCellW).coerceAtLeast(1),
-                                (startH + deltaCellH).coerceAtLeast(1)
+                            val deltaCellX = (moveAccum.x / cellStepPx).roundToInt()
+                            val deltaCellY = (moveAccum.y / cellHeightStepPx).roundToInt()
+                            val current = latestWidget.value
+                            val candidate = GridEngine.Rect(
+                                startX + deltaCellX,
+                                startY + deltaCellY,
+                                current.w,
+                                current.h
                             )
-                        )
-                    }
-                )
-            }
-    )
 
-    // Suppression : pas de confirmation (coherent avec le reste de
-    // l'app — removePage n'en a pas non plus), un tap suffit. A
-    // reconsiderer si ca s'avere source d'accidents en usage reel.
-    Box(
-        modifier = Modifier
-            .align(Alignment.TopStart)
-            .padding(4.dp)
-            .size(HANDLE_SIZE)
-            .clip(CircleShape)
-            .background(AccentRed)
-            .clickable(onClick = onDelete),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            Icons.Filled.Close,
-            contentDescription = "Supprimer le widget",
-            tint = TextPrimary,
-            modifier = Modifier.size(14.dp)
+                            val preview = GridEngine.resolvePushLayout(
+                                draggedId = widget.id,
+                                candidate = candidate,
+                                allWidgets = latestAllWidgets.value,
+                                columns = columns
+                            )
+                            lastPreview = preview
+                            onMovePreview(preview, moveAccum)
+                        },
+                        onDragEnd = {
+                            lastPreview?.let { onMoveCommit(it) } ?: onMoveCancel()
+                        },
+                        onDragCancel = {
+                            onMoveCancel()
+                        }
+                    )
+                }
         )
+
+        var startW by remember { mutableIntStateOf(0) }
+        var startH by remember { mutableIntStateOf(0) }
+        var resizeAccum by remember { mutableStateOf(Offset.Zero) }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(4.dp)
+                .size(HANDLE_SIZE)
+                .clip(CircleShape)
+                .background(AccentBlue)
+                .pointerInput(widget.id) {
+                    detectDragGestures(
+                        onDragStart = {
+                            startW = latestWidget.value.w
+                            startH = latestWidget.value.h
+                            resizeAccum = Offset.Zero
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            resizeAccum += dragAmount
+                            val deltaCellW = (resizeAccum.x / cellStepPx).roundToInt()
+                            val deltaCellH = (resizeAccum.y / cellHeightStepPx).roundToInt()
+                            val current = latestWidget.value
+                            onResizeUpdate(
+                                widget.id,
+                                GridEngine.Rect(
+                                    current.x,
+                                    current.y,
+                                    (startW + deltaCellW).coerceAtLeast(1),
+                                    (startH + deltaCellH).coerceAtLeast(1)
+                                )
+                            )
+                        }
+                    )
+                }
+        )
+
+        // Suppression : pas de confirmation (coherent avec le reste de
+        // l'app — removePage n'en a pas non plus), un tap suffit. A
+        // reconsiderer si ca s'avere source d'accidents en usage reel.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(4.dp)
+                .size(HANDLE_SIZE)
+                .clip(CircleShape)
+                .background(AccentRed)
+                .clickable(onClick = onDelete),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = "Supprimer le widget",
+                tint = TextPrimary,
+                modifier = Modifier.size(14.dp)
+            )
+        }
     }
 }

@@ -30,7 +30,7 @@ data class DomoticzDeviceDto(
     val Temp: Double? = null,
     // Consigne configuree (thermostats)
     val SetPoint: Double? = null,
-    val Humidity: Int? = null,
+    val Humidity: Double? = null,
     // Format Domoticz : "yyyy-MM-dd HH:mm:ss", heure locale du serveur Domoticz
     val LastUpdate: String? = null,
     // JSON brut renvoye par Domoticz pour les lumieres couleur, ex:

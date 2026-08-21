@@ -3,10 +3,10 @@ package com.homehabit.app.ui.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homehabit.app.data.ConfigRepository
-import com.homehabit.app.data.FakeStateProvider
 import com.homehabit.app.data.SensorKind
 import com.homehabit.app.data.WidgetLiveState
 import com.homehabit.app.data.WidgetStateEntry
+import com.homehabit.app.data.camera.CameraRepository
 import com.homehabit.app.data.domoticz.DiscoveredDomoticzDevice
 import com.homehabit.app.data.domoticz.DiscoveredDomoticzScene
 import com.homehabit.app.data.domoticz.DomoticzClient
@@ -18,6 +18,7 @@ import com.homehabit.app.engine.GridEngine
 import com.homehabit.app.model.AppSettings
 import com.homehabit.app.model.DashboardConfig
 import com.homehabit.app.model.DashboardPage
+import com.homehabit.app.model.GridConfig
 import com.homehabit.app.model.WidgetConfig
 import com.homehabit.app.model.WidgetSource
 import com.homehabit.app.model.WidgetType
@@ -27,7 +28,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class DashboardViewModel(
@@ -42,6 +45,7 @@ class DashboardViewModel(
 
     private val weatherClient = OpenMeteoClient()
     private val weatherRepository = WeatherRepository(weatherClient)
+    private val cameraRepository = CameraRepository()
 
     // Source unique de la config : vient directement du repository, partagee
     // avec le serveur HTTP. Toute modification (drag/resize, ajout, ou
@@ -58,19 +62,21 @@ class DashboardViewModel(
         _currentPageIndex.value = index
     }
 
-    // Etats "demo" (uniquement la camera desormais) fusionnes avec les
-    // etats reels Domoticz et meteo. Les etats live sont globaux (pas
-    // rattaches a une page) : peu importe la page ou vit un widget, son
-    // etat continue d'etre rafraichi meme si on ne le regarde pas.
-    private var demoStates: Map<String, WidgetStateEntry> = emptyMap()
+    // Etats reels Domoticz, meteo et camera fusionnes. Les etats live
+    // sont globaux (pas rattaches a une page) : peu importe la page ou
+    // vit un widget, son etat continue d'etre rafraichi meme si on ne le
+    // regarde pas.
     private var domoticzStates: Map<String, WidgetStateEntry> = emptyMap()
     private var weatherStates: Map<String, WidgetStateEntry> = emptyMap()
+    private var cameraStates: Map<String, WidgetStateEntry> = emptyMap()
 
     private val _widgetStates = MutableStateFlow<Map<String, WidgetStateEntry>>(emptyMap())
     val widgetStates: StateFlow<Map<String, WidgetStateEntry>> = _widgetStates.asStateFlow()
 
     private val _isEditMode = MutableStateFlow(false)
     val isEditMode: StateFlow<Boolean> = _isEditMode.asStateFlow()
+
+    private var originalConfig: DashboardConfig? = null
 
     private val _availableDevices = MutableStateFlow<List<DiscoveredDomoticzDevice>>(emptyList())
     val availableDevices: StateFlow<List<DiscoveredDomoticzDevice>> = _availableDevices.asStateFlow()
@@ -89,12 +95,24 @@ class DashboardViewModel(
     private var domoticzPollingJob: Job? = null
 
     fun load() {
-        demoStates = FakeStateProvider.defaultStates()
-        publishMergedStates()
-
         startWeatherPolling()
         startDomoticzPolling()
+        startCameraPolling()
         startSparklinePolling()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun startCameraPolling() {
+        viewModelScope.launch {
+            repository.configFlow
+                .map { cfg -> cfg.allWidgets().filter { it.widgetType == WidgetType.CAMERA } }
+                .distinctUntilChanged()
+                .flatMapLatest { widgets -> cameraRepository.observeStates(widgets) }
+                .collect { states ->
+                    cameraStates = states
+                    publishMergedStates()
+                }
+        }
     }
 
     /**
@@ -106,7 +124,9 @@ class DashboardViewModel(
     private fun startWeatherPolling() {
         viewModelScope.launch {
             repository.configFlow
-                .flatMapLatest { cfg -> weatherRepository.observeStates(cfg.allWidgets()) }
+                .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "open-meteo" } }
+                .distinctUntilChanged()
+                .flatMapLatest { widgets -> weatherRepository.observeStates(widgets) }
                 .collect { states ->
                     weatherStates = states
                     publishMergedStates()
@@ -125,9 +145,22 @@ class DashboardViewModel(
         domoticzPollingJob?.cancel()
         domoticzPollingJob = viewModelScope.launch {
             repository.configFlow
-                .flatMapLatest { cfg -> domoticzRepository.observeStates(cfg.allWidgets()) }
+                .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "domoticz" } }
+                .distinctUntilChanged()
+                .flatMapLatest { widgets -> domoticzRepository.observeStates(widgets) }
                 .collect { states ->
-                    domoticzStates = states
+                    // Fusion intelligente : on ne remplace un etat local que si l'etat 
+                    // renvoye par le serveur est plus recent. On ajoute une marge de 
+                    // 2 secondes pour compenser un eventuel decalage d'horloge entre 
+                    // le telephone et le serveur Domoticz.
+                    val merged = domoticzStates.toMutableMap()
+                    states.forEach { (id, incoming) ->
+                        val existing = merged[id]
+                        if (existing == null || incoming.lastUpdate > (existing.lastUpdate - 2000)) {
+                            merged[id] = incoming
+                        }
+                    }
+                    domoticzStates = merged
                     publishMergedStates()
                 }
         }
@@ -158,7 +191,7 @@ class DashboardViewModel(
         viewModelScope.launch {
             // Laisse le temps au premier cycle de poll Domoticz (etats
             // sensor/thermostat) de repondre avant la premiere verification.
-            delay(5_000L)
+            delay(8_000L)
 
             while (true) {
                 val eligibleWidgets = repository.current().allWidgets().filter { widget ->
@@ -186,16 +219,31 @@ class DashboardViewModel(
     }
 
     fun toggleEditMode() {
-        _isEditMode.value = !_isEditMode.value
+        val nextMode = !_isEditMode.value
+        if (nextMode) {
+            originalConfig = repository.current()
+        } else {
+            originalConfig = null
+        }
+        _isEditMode.value = nextMode
+    }
+
+    fun cancelEditMode() {
+        originalConfig?.let {
+            repository.updateConfig(it)
+        }
+        originalConfig = null
+        _isEditMode.value = false
     }
 
     private fun publishMergedStates() {
-        _widgetStates.value = demoStates + domoticzStates + weatherStates
+        _widgetStates.value = domoticzStates + weatherStates + cameraStates
     }
 
     fun toggleLight(widgetId: String) {
         val widget = repository.current().findWidget(widgetId) ?: return
-        val current = _widgetStates.value[widgetId]?.state as? WidgetLiveState.Light
+        val entry = _widgetStates.value[widgetId]
+        val current = entry?.state as? WidgetLiveState.Light
         val newValue = current?.isOn != true
 
         viewModelScope.launch {
@@ -207,7 +255,8 @@ class DashboardViewModel(
                         brightness = current?.brightness,
                         colorHex = current?.colorHex
                     ),
-                    lastUpdate = System.currentTimeMillis()
+                    lastUpdate = System.currentTimeMillis(),
+                    fallbackName = entry?.fallbackName
                 ))
                 publishMergedStates()
             }
@@ -217,7 +266,8 @@ class DashboardViewModel(
     /** Widgets DIMMER/COLOR_LIGHT : ajuste la luminosite (0-100). */
     fun setBrightness(widgetId: String, percent: Int) {
         val widget = repository.current().findWidget(widgetId) ?: return
-        val current = _widgetStates.value[widgetId]?.state as? WidgetLiveState.Light
+        val entry = _widgetStates.value[widgetId]
+        val current = entry?.state as? WidgetLiveState.Light
 
         viewModelScope.launch {
             val ok = domoticzRepository.setBrightness(widget, percent)
@@ -228,7 +278,8 @@ class DashboardViewModel(
                         brightness = percent,
                         colorHex = current?.colorHex
                     ),
-                    lastUpdate = System.currentTimeMillis()
+                    lastUpdate = System.currentTimeMillis(),
+                    fallbackName = entry?.fallbackName
                 ))
                 publishMergedStates()
             }
@@ -238,7 +289,8 @@ class DashboardViewModel(
     /** Widgets COLOR_LIGHT uniquement : change la couleur (palette de presets). */
     fun setLightColor(widgetId: String, hex: String) {
         val widget = repository.current().findWidget(widgetId) ?: return
-        val current = _widgetStates.value[widgetId]?.state as? WidgetLiveState.Light
+        val entry = _widgetStates.value[widgetId]
+        val current = entry?.state as? WidgetLiveState.Light
 
         viewModelScope.launch {
             val ok = domoticzRepository.setColor(widget, hex, current?.brightness)
@@ -249,7 +301,8 @@ class DashboardViewModel(
                         brightness = current?.brightness,
                         colorHex = hex
                     ),
-                    lastUpdate = System.currentTimeMillis()
+                    lastUpdate = System.currentTimeMillis(),
+                    fallbackName = entry?.fallbackName
                 ))
                 publishMergedStates()
             }
@@ -258,12 +311,14 @@ class DashboardViewModel(
 
     fun setShutterOpen(widgetId: String, open: Boolean) {
         val widget = repository.current().findWidget(widgetId) ?: return
+        val entry = _widgetStates.value[widgetId]
         viewModelScope.launch {
             val ok = domoticzRepository.setShutterOpen(widget, open)
             if (ok) {
                 domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
                     state = WidgetLiveState.Shutter(percentOpen = if (open) 100 else 0),
-                    lastUpdate = System.currentTimeMillis()
+                    lastUpdate = System.currentTimeMillis(),
+                    fallbackName = entry?.fallbackName
                 ))
                 publishMergedStates()
             }
@@ -293,7 +348,8 @@ class DashboardViewModel(
 
     fun toggleLock(widgetId: String) {
         val widget = repository.current().findWidget(widgetId) ?: return
-        val current = _widgetStates.value[widgetId]?.state as? WidgetLiveState.Lock
+        val entry = _widgetStates.value[widgetId]
+        val current = entry?.state as? WidgetLiveState.Lock
         val newValue = current?.isLocked != true
 
         viewModelScope.launch {
@@ -301,7 +357,8 @@ class DashboardViewModel(
             if (ok) {
                 domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
                     state = WidgetLiveState.Lock(isLocked = newValue),
-                    lastUpdate = System.currentTimeMillis()
+                    lastUpdate = System.currentTimeMillis(),
+                    fallbackName = entry?.fallbackName
                 ))
                 publishMergedStates()
             }
@@ -310,12 +367,14 @@ class DashboardViewModel(
 
     fun setThermostatSetpoint(widgetId: String, value: Float) {
         val widget = repository.current().findWidget(widgetId) ?: return
+        val entry = _widgetStates.value[widgetId]
         viewModelScope.launch {
             val ok = domoticzRepository.setThermostatSetpoint(widget, value)
             if (ok) {
                 domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
                     state = WidgetLiveState.Thermostat(temperature = value),
-                    lastUpdate = System.currentTimeMillis()
+                    lastUpdate = System.currentTimeMillis(),
+                    fallbackName = entry?.fallbackName
                 ))
                 publishMergedStates()
             }
@@ -419,18 +478,21 @@ class DashboardViewModel(
     }
 
     fun addDiscoveredDevice(device: DiscoveredDomoticzDevice, w: Int = 1, h: Int = 1) {
+        val isSystem = device.idx.startsWith("system_")
         val newWidget = WidgetConfig(
-            id = "domoticz_${device.idx}",
+            id = if (isSystem) "${device.idx}_${System.currentTimeMillis()}" else "domoticz_${device.idx}",
             type = device.widgetType.name.lowercase(),
             x = 0,
             y = 0,
             w = w,
             h = h,
             label = device.name,
-            source = WidgetSource(provider = "domoticz", deviceId = "idx:${device.idx}")
+            source = if (isSystem) null else WidgetSource(provider = "domoticz", deviceId = "idx:${device.idx}")
         )
         addWidget(newWidget)
-        _availableDevices.value = _availableDevices.value.filterNot { it.idx == device.idx }
+        if (!isSystem) {
+            _availableDevices.value = _availableDevices.value.filterNot { it.idx == device.idx }
+        }
     }
 
     fun discoverDomoticzScenes() {
@@ -453,7 +515,7 @@ class DashboardViewModel(
             y = 0,
             w = w,
             h = h,
-            label = scene.name,
+            label = scene.name, // Nom Domoticz ecrit en dur dans le JSON
             source = WidgetSource(provider = "domoticz", deviceId = "idx:${scene.idx}")
         )
         addWidget(newWidget)
@@ -463,7 +525,8 @@ class DashboardViewModel(
     /** Tap sur un widget scene/groupe : declenche la scene (toujours "On"), ou bascule le groupe on/off. */
     fun triggerScene(widgetId: String) {
         val widget = repository.current().findWidget(widgetId) ?: return
-        val current = _widgetStates.value[widgetId]?.state as? WidgetLiveState.Scene
+        val entry = _widgetStates.value[widgetId]
+        val current = entry?.state as? WidgetLiveState.Scene
         val isGroup = current?.isGroup == true
         val newValue = if (isGroup) current?.isOn != true else true
 
@@ -472,7 +535,8 @@ class DashboardViewModel(
             if (ok) {
                 domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
                     state = WidgetLiveState.Scene(isGroup = isGroup, isOn = newValue),
-                    lastUpdate = System.currentTimeMillis()
+                    lastUpdate = System.currentTimeMillis(),
+                    fallbackName = entry?.fallbackName
                 ))
                 publishMergedStates()
             }
@@ -499,6 +563,13 @@ class DashboardViewModel(
         val current = repository.current()
         val page = current.pages.getOrNull(pageIndex) ?: return
         repository.updateConfig(current.replacingPage(pageIndex, page.copy(name = newName.trim())))
+    }
+
+    fun updatePageConfig(pageIndex: Int, name: String, grid: GridConfig) {
+        if (name.isBlank()) return
+        val current = repository.current()
+        val page = current.pages.getOrNull(pageIndex) ?: return
+        repository.updateConfig(current.replacingPage(pageIndex, page.copy(name = name.trim(), grid = grid)))
     }
 
     /** Refuse de supprimer la derniere page restante : toujours au moins une. */

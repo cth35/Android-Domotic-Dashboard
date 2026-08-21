@@ -138,7 +138,7 @@ class DomoticzClient(private val config: DomoticzConfig) {
      * Best-effort : retourne null si l'appel echoue ou si le device n'a
      * pas de temperature (ex. capteur non-temp), plutot que de planter.
      */
-    suspend fun getTempGraphDay(idx: String): List<Float>? = runCatching {
+    suspend fun getTempGraphDay(idx: String): List<DomoticzGraphPointDto>? = runCatching {
         val response: DomoticzGraphResponse = httpClient.get("${config.baseUrl}/json.htm") {
             parameter("type", "command")
             parameter("param", "graph")
@@ -146,9 +146,7 @@ class DomoticzClient(private val config: DomoticzConfig) {
             parameter("idx", idx)
             parameter("range", "day")
         }.body()
-        response.result
-            ?.mapNotNull { it.te?.toFloatOrNull() }
-            ?.takeIf { it.isNotEmpty() }
+        response.result?.takeIf { it.isNotEmpty() }
     }.getOrNull()
 
     /**

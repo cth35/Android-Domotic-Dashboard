@@ -32,12 +32,18 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.homehabit.app.camera.RtspThumbnailGrabber
 import com.homehabit.app.data.SensorKind
 import com.homehabit.app.data.WidgetLiveState
@@ -92,83 +98,165 @@ fun WidgetCard(
     val scene = state as? WidgetLiveState.Scene
     val shutter = state as? WidgetLiveState.Shutter
     val lock = state as? WidgetLiveState.Lock
+
+    // On reste sur un fond sombre uniforme type HomeHabit, sauf feedback
+    // tres spécifique (ex: alerte lock).
     val backgroundColor = when (config.widgetType) {
-        WidgetType.LIGHT, WidgetType.DIMMER ->
-            if (light?.isOn == true) AccentGreenSurface else SurfaceDark
-
-        WidgetType.COLOR_LIGHT -> when {
-            light?.isOn != true -> SurfaceDark
-            light.colorHex != null -> runCatching {
-                Color(android.graphics.Color.parseColor(light.colorHex)).copy(alpha = 0.28f)
-            }.getOrDefault(AccentGreenSurface)
-            else -> AccentGreenSurface
-        }
-
-        // Pour une vraie Scene (pas Group), isOn ne reste vrai que
-        // jusqu'au prochain poll (5s) : Domoticz ne garde pas d'etat
-        // persistant pour un declencheur. Le flash vert bref sert de
-        // retour visuel "declenchee", pas un vrai etat durable.
-        WidgetType.SCENE -> if (scene?.isOn == true) AccentGreenSurface else SurfaceDark
-
-        // Meme logique "actif/engage" que la lumiere : volet ouvert a
-        // plus de la moitie = etat engage, teinte verte coherente avec
-        // le reste de la palette plutot qu'une nouvelle couleur dediee.
-        WidgetType.SHUTTER -> if ((shutter?.percentOpen ?: 0) > 50) AccentGreenSurface else SurfaceDark
-
-        // Inverse des autres : c'est l'etat DEVERROUILLE qui merite
-        // l'attention (teinte rouge), pas l'etat verrouille qui reste
-        // neutre — une serrure fermee n'a rien de particulier a signaler.
         WidgetType.LOCK -> if (lock?.isLocked == false) AccentRedSurface else SurfaceDark
-
         else -> SurfaceDark
     }
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .let {
                 if (onClick != null || onLongClick != null) {
                     it.combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongClick)
                 } else it
             }
-            .padding(10.dp)
     ) {
-        when (config.widgetType) {
-            WidgetType.WEATHER -> WeatherContent(state as? WidgetLiveState.Weather)
-            WidgetType.FORECAST -> ForecastContent(state as? WidgetLiveState.Forecast)
-            WidgetType.LIGHT, WidgetType.DIMMER, WidgetType.COLOR_LIGHT ->
-                LightContent(config, light)
-            WidgetType.THERMOSTAT -> ThermostatContent(state as? WidgetLiveState.Thermostat, sparkline)
-            WidgetType.SHUTTER -> if (config.source?.shutterStyle == "toggle") {
-                ShutterToggleContent(state as? WidgetLiveState.Shutter)
-            } else {
-                ShutterButtonsContent(
-                    state = state as? WidgetLiveState.Shutter,
-                    onOpen = { onShutterOpen?.invoke() },
-                    onStop = { onShutterStop?.invoke() },
-                    onClose = { onShutterClose?.invoke() }
-                )
+        // Overlay Camera : prend tout l'espace
+        if (config.widgetType == WidgetType.CAMERA || config.widgetType == WidgetType.CLOCK) {
+            when (config.widgetType) {
+                WidgetType.CAMERA -> CameraContent(config, state as? WidgetLiveState.Camera)
+                WidgetType.CLOCK -> ClockContent()
+                else -> {}
             }
-            WidgetType.LOCK -> LockContent(config.label, state as? WidgetLiveState.Lock)
-            WidgetType.SENSOR -> SensorContent(config, state as? WidgetLiveState.Sensor, sparkline)
-            WidgetType.SCENE -> SceneContent(config, state as? WidgetLiveState.Scene)
-            WidgetType.CAMERA -> CameraContent(config, state as? WidgetLiveState.Camera)
-            else -> EmptyContent(config.label)
-        }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header : Label custom ou nom Domoticz en repli
+                Text(
+                    text = config.label.takeIf { !it.isNullOrBlank() } ?: entry?.fallbackName ?: "",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (entry != null) {
+                    RelativeTimeBadge(entry.lastUpdate)
+                }
 
-        if (entry != null) {
-            LastUpdateBadge(
-                lastUpdate = entry.lastUpdate,
-                modifier = Modifier.align(Alignment.TopEnd)
-            )
+                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.weight(0.5f))
+
+                // Contenu central
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (config.widgetType) {
+                        WidgetType.WEATHER -> WeatherContent(state as? WidgetLiveState.Weather)
+                        WidgetType.FORECAST -> ForecastContent(state as? WidgetLiveState.Forecast)
+                        WidgetType.LIGHT, WidgetType.DIMMER, WidgetType.COLOR_LIGHT ->
+                            LightContent(config, light)
+                        WidgetType.THERMOSTAT -> ThermostatContent(state as? WidgetLiveState.Thermostat, sparkline)
+                        WidgetType.SHUTTER -> if (config.source?.shutterStyle == "toggle") {
+                            ShutterToggleContent(state as? WidgetLiveState.Shutter)
+                        } else {
+                            ShutterButtonsContent(
+                                state = state as? WidgetLiveState.Shutter,
+                                onOpen = { onShutterOpen?.invoke() },
+                                onStop = { onShutterStop?.invoke() },
+                                onClose = { onShutterClose?.invoke() }
+                            )
+                        }
+                        WidgetType.LOCK -> LockContent(state as? WidgetLiveState.Lock)
+                        WidgetType.SENSOR -> SensorContent(state as? WidgetLiveState.Sensor, sparkline)
+                        WidgetType.SCENE -> SceneContent(state as? WidgetLiveState.Scene)
+                        WidgetType.BINARY_SENSOR -> BinarySensorContent(state as? WidgetLiveState.BinarySensor)
+                        else -> EmptyContent()
+                    }
+                }
+                
+                Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
 
-/** Petit badge discret, se rafraichit tout seul toutes les 30s pour que le texte relatif reste juste. */
 @Composable
-private fun LastUpdateBadge(lastUpdate: Long, modifier: Modifier = Modifier) {
+private fun ClockContent() {
+    var time by remember { mutableStateOf("") }
+    var date by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        val timeFormat = SimpleDateFormat("HH:mm", Locale.FRANCE)
+        val dateFormat = SimpleDateFormat("EEEE d MMMM", Locale.FRANCE)
+        while (true) {
+            val now = Date()
+            time = timeFormat.format(now)
+            date = dateFormat.format(now).replaceFirstChar { it.uppercase() }
+            delay(1000L)
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = time,
+            color = TextPrimary,
+            fontSize = 75.sp,
+            fontWeight = FontWeight.ExtraBold,
+            lineHeight = 56.sp,
+            letterSpacing = (-1).sp
+        )
+        Text(
+            text = date,
+            color = TextSecondary,
+            fontSize = 23.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun BinarySensorContent(state: WidgetLiveState.BinarySensor?) {
+    val isOn = state?.isOn == true
+    val isContact = state?.isContact == true
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = when {
+                isContact && isOn -> Icons.Filled.DoorBack
+                isContact && !isOn -> Icons.Filled.DoorFront
+                isOn -> Icons.Default.DirectionsWalk
+                else -> Icons.Default.DirectionsWalk
+            },
+            contentDescription = null,
+            tint = if (isOn) AccentOrange else TextSecondary,
+            modifier = Modifier.size(28.dp)
+        )
+        Text(
+            text = when {
+                isContact && isOn -> "OUVERT"
+                isContact && !isOn -> "FERMÉ"
+                isOn -> "MOUVEMENT"
+                else -> "AUCUN"
+            },
+            color = if (isOn) TextPrimary else TextSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun RelativeTimeBadge(lastUpdate: Long) {
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -176,36 +264,39 @@ private fun LastUpdateBadge(lastUpdate: Long, modifier: Modifier = Modifier) {
             now = System.currentTimeMillis()
         }
     }
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(SurfaceDark.copy(alpha = 0.7f))
-            .padding(horizontal = 5.dp, vertical = 2.dp)
-    ) {
-        Text(
-            text = formatRelativeTime(lastUpdate, now),
-            color = TextMuted,
-            fontSize = 9.sp
-        )
-    }
+    Text(
+        text = formatRelativeTime(lastUpdate, now),
+        color = TextSecondary,
+        fontSize = 12.sp,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
 private fun WeatherContent(state: WidgetLiveState.Weather?) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        WidgetIcon(Icons.Filled.Cloud, AccentBlueMuted)
-        Column {
-            Text(
-                text = state?.let { "${it.temperature}°C" } ?: "--",
-                color = TextPrimary,
-                fontSize = 18.sp
-            )
-            Text(
-                text = state?.let { "${it.condition} · min ${it.min}° max ${it.max}°" } ?: "Chargement...",
-                color = TextSecondary,
-                fontSize = 11.sp
-            )
-        }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            Icons.Filled.Cloud,
+            contentDescription = null,
+            tint = AccentBlueMuted,
+            modifier = Modifier.size(24.dp)
+        )
+        Text(
+            text = state?.let { "${it.temperature}°" } ?: "--",
+            color = TextPrimary,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = 32.sp
+        )
+        Text(
+            text = state?.let { "${it.condition} · ${it.min}°/${it.max}°" } ?: "Chargement...",
+            color = TextSecondary,
+            fontSize = 9.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -222,7 +313,7 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
     val days = state?.days.orEmpty()
 
     if (days.isEmpty()) {
-        Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             WidgetIcon(Icons.Filled.Cloud, TextSecondary)
             Text(text = "Prevision 7 jours", color = TextSecondary, fontSize = 11.sp)
         }
@@ -230,28 +321,35 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
     }
 
     Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        days.forEach { day ->
+        days.take(7).forEach { day ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.width(36.dp)
+                modifier = Modifier.weight(1f)
             ) {
-                Text(text = day.dayLabel, color = TextSecondary, fontSize = 10.sp)
+                Text(
+                    text = day.dayLabel, 
+                    color = TextSecondary, 
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
                 Spacer(Modifier.height(4.dp))
                 Icon(
                     iconForWeatherCode(day.weatherCode),
                     contentDescription = day.condition,
                     tint = AccentBlueMuted,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(32.dp)
                 )
                 Spacer(Modifier.height(4.dp))
-                Text(text = "${day.tempMax}°", color = TextPrimary, fontSize = 11.sp)
-                Text(text = "${day.tempMin}°", color = TextSecondary, fontSize = 9.sp)
+                Text(
+                    text = "${day.tempMax}°", 
+                    color = TextPrimary, 
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
         }
     }
@@ -272,65 +370,80 @@ private fun iconForWeatherCode(code: Int?): ImageVector = when (code) {
 private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
     val isOn = state?.isOn == true
     val isColorLight = config.widgetType == WidgetType.COLOR_LIGHT
-    val isDimmable = config.widgetType != WidgetType.LIGHT
-
+    
     val swatchColor = if (isColorLight && isOn) {
         state?.colorHex?.let { hex ->
             runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrNull()
         }
     } else null
 
-    val iconTint = when {
-        !isOn -> TextSecondary
-        swatchColor != null -> swatchColor
-        else -> AccentGreen
-    }
-
-    Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            WidgetIcon(if (isOn) Icons.Filled.Lightbulb else Icons.Outlined.WbIncandescent, iconTint)
-            if (swatchColor != null) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(swatchColor)
-                )
+    val color = if (isOn) AccentGreen else TextMuted
+    
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(if (isOn) (swatchColor ?: color).copy(alpha = 0.3f) else SurfaceVariantDark),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.PowerSettingsNew,
+                contentDescription = null,
+                tint = if (isOn) (swatchColor ?: color) else TextSecondary,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        
+        if (isColorLight && isOn) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable { /* Clic géré par le parent via onLongClick */ }
+            ) {
+                listOf("#4A90D9", "#A8D67A", "#E8B26A", "#E35B5B").forEach { hex ->
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(android.graphics.Color.parseColor(hex)))
+                    )
+                }
             }
         }
-        Column {
-            Text(
-                text = config.label ?: "Lumiere",
-                color = if (isOn) TextPrimary else TextSecondary,
-                fontSize = 11.sp
-            )
-            if (isDimmable && isOn && state?.brightness != null) {
-                Text(text = "${state.brightness}%", color = TextSecondary, fontSize = 9.sp)
-            }
+
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = if (isOn) "ON" else "OFF",
+            color = if (isOn) TextPrimary else TextSecondary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        if (isOn && state?.brightness != null) {
+            Text(text = "${state.brightness}%", color = TextSecondary, fontSize = 10.sp)
         }
     }
 }
 
 @Composable
 private fun ThermostatContent(state: WidgetLiveState.Thermostat?, sparkline: List<Float>?) {
-    Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
-        WidgetIcon(Icons.Filled.Thermostat, AccentOrange)
-        Column {
-            Text(
-                text = state?.let { "${it.temperature}°C" } ?: "--",
-                color = TextPrimary,
-                fontSize = 11.sp
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = state?.let { "${it.temperature}".replace(".", ",") + "°" } ?: "--",
+            color = TextPrimary,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.Bold
+        )
+        if (sparkline != null && sparkline.size >= 2) {
+            Spacer(Modifier.height(2.dp))
+            Sparkline(
+                values = sparkline,
+                color = AccentOrange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
             )
-            if (sparkline != null && sparkline.size >= 2) {
-                Spacer(Modifier.height(4.dp))
-                Sparkline(
-                    values = sparkline,
-                    color = AccentOrange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(16.dp)
-                )
-            }
         }
     }
 }
@@ -342,150 +455,134 @@ private fun ShutterButtonsContent(
     onStop: () -> Unit,
     onClose: () -> Unit
 ) {
-    val isOpen = (state?.percentOpen ?: 0) > 50
-    Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
-        WidgetIcon(Icons.Filled.Blinds, if (isOpen) AccentGreen else TextSecondary)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        val percent = state?.percentOpen ?: 0
         Text(
-            text = state?.let { "Volet ${it.percentOpen}%" } ?: "Volet",
+            text = when (percent) {
+                0 -> "FERMÉ"
+                100 -> "OUVERT"
+                else -> "$percent%"
+            },
             color = TextPrimary,
-            fontSize = 11.sp
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            ShutterButton(Icons.Filled.KeyboardArrowUp, "Ouvrir", onOpen)
-            ShutterButton(Icons.Filled.Stop, "Stop", onStop)
-            ShutterButton(Icons.Filled.KeyboardArrowDown, "Fermer", onClose)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LocalIconButton(onClick = onOpen, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.KeyboardArrowUp, null, tint = TextPrimary, modifier = Modifier.size(24.dp))
+            }
+            LocalIconButton(onClick = onStop, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.Stop, null, tint = TextPrimary, modifier = Modifier.size(24.dp))
+            }
+            LocalIconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.KeyboardArrowDown, null, tint = TextPrimary, modifier = Modifier.size(24.dp))
+            }
         }
     }
 }
 
-/**
- * Style "toggle" (source.shutterStyle == "toggle") : tap sur tout le
- * widget bascule ouvert/ferme selon la position actuelle (seuil 50%),
- * pas de bouton stop accessible dans ce mode — plus compact, mais moins
- * de controle que le style 3 boutons (par defaut).
- */
 @Composable
 private fun ShutterToggleContent(state: WidgetLiveState.Shutter?) {
     val isOpen = (state?.percentOpen ?: 0) > 50
-    Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
-        WidgetIcon(Icons.Filled.Blinds, if (isOpen) AccentGreen else TextSecondary)
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = if (isOpen) Icons.Filled.Blinds else Icons.Filled.BlindsClosed,
+            contentDescription = null,
+            tint = if (isOpen) AccentGreen else TextSecondary,
+            modifier = Modifier.size(28.dp)
+        )
         Text(
-            text = state?.let { "Volet ${it.percentOpen}%" } ?: "Volet",
+            text = state?.let { "${it.percentOpen}%" } ?: "--",
             color = TextPrimary,
-            fontSize = 11.sp
+            fontSize = 12.sp
         )
     }
 }
 
-/**
- * Zone tactile volontairement petite (20dp) pour tenir 3 boutons sur un
- * widget 1x1 — a valider au doigt sur un vrai device, comme la poignee
- * de resize en mode edition. Fonctionne quelle que soit la taille du
- * widget, mais plus confortable sur un widget 2x1.
- */
 @Composable
-private fun ShutterButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(20.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(SurfaceVariantDark)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, contentDescription = contentDescription, tint = TextPrimary, modifier = Modifier.size(14.dp))
-    }
-}
-
-@Composable
-private fun LockContent(label: String?, state: WidgetLiveState.Lock?) {
+private fun LockContent(state: WidgetLiveState.Lock?) {
     val locked = state?.isLocked == true
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        WidgetIcon(
-            icon = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-            tint = if (locked) TextSecondary else AccentRed
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = if (locked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+            contentDescription = null,
+            tint = if (locked) TextSecondary else AccentRed,
+            modifier = Modifier.size(28.dp)
         )
-        Text(text = label ?: "Porte", color = TextPrimary, fontSize = 11.sp)
+        Text(
+            text = if (locked) "VERROUILLÉ" else "DÉVERROUILLÉ",
+            color = if (locked) TextSecondary else AccentRed,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
 @Composable
-private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, sparkline: List<Float>?) {
-    val kind = state?.kind ?: SensorKind.GENERIC
-
-    Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
-        WidgetIcon(iconForSensorKind(kind), tintForSensorKind(kind))
-        Column {
-            Text(text = state?.displayValue ?: "--", color = TextPrimary, fontSize = 15.sp)
-            Text(text = config.label ?: "Capteur", color = TextSecondary, fontSize = 9.sp)
-
-            state?.gaugePercent?.let { percent ->
-                Spacer(Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(SurfaceVariantDark)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(percent.coerceIn(0f, 1f))
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(tintForSensorKind(kind))
-                    )
-                }
-            }
-
-            if (kind == SensorKind.TEMPERATURE && sparkline != null && sparkline.size >= 2) {
-                Spacer(Modifier.height(4.dp))
-                Sparkline(
-                    values = sparkline,
-                    color = tintForSensorKind(kind),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(16.dp)
-                )
-            }
-        }
+private fun SensorContent(state: WidgetLiveState.Sensor?, sparkline: List<Float>?) {
+    val displayValue = state?.displayValue ?: "--"
+    val (value, unit) = splitValueAndUnit(displayValue)
+    val isTemp = state?.kind == SensorKind.TEMPERATURE
+    
+    val kindUnit = when (state?.kind) {
+        SensorKind.TEMPERATURE -> "" // Affiché via ° à côté de la valeur
+        SensorKind.HUMIDITY -> "PERCENT"
+        else -> unit?.uppercase() ?: ""
     }
-}
 
-/**
- * Scene : icone + label, tap = declenchement (voir DashboardScreen).
- * "Actif"/"Inactif" affiche uniquement pour un Group (etat reel),
- * jamais pour une Scene (pas d'etat durable cote Domoticz).
- */
-@Composable
-private fun SceneContent(config: WidgetConfig, state: WidgetLiveState.Scene?) {
-    val isOn = state?.isOn == true
-    val tint = if (isOn) AccentGreen else TextSecondary
-
-    Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
-        WidgetIcon(Icons.Filled.AutoAwesome, tint)
-        Column {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value.replace(".", ",") + (if (isTemp) "°" else ""),
+            color = TextPrimary,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Visible
+        )
+        if (kindUnit.isNotBlank()) {
             Text(
-                text = config.label ?: "Scene",
-                color = if (isOn) TextPrimary else TextSecondary,
-                fontSize = 11.sp
+                text = kindUnit,
+                color = TextSecondary,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium
             )
-            if (state?.isGroup == true) {
-                Text(
-                    text = if (isOn) "Actif" else "Inactif",
-                    color = TextSecondary,
-                    fontSize = 9.sp
-                )
-            }
+        }
+        
+        if (sparkline != null && sparkline.size >= 2) {
+            Spacer(Modifier.height(2.dp))
+            Sparkline(
+                values = sparkline,
+                color = tintForSensorKind(state?.kind ?: SensorKind.GENERIC),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
+            )
         }
     }
 }
 
-/**
- * Mini-graphe en ligne (sparkline), purement decoratif : pas d'axes,
- * pas de labels, juste la tendance. Normalise entre le min et le max
- * de la serie fournie.
- */
+@Composable
+private fun SceneContent(state: WidgetLiveState.Scene?) {
+    val isOn = state?.isOn == true
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            Icons.Filled.AutoAwesome,
+            contentDescription = null,
+            tint = if (isOn) AccentGreen else TextSecondary,
+            modifier = Modifier.size(28.dp)
+        )
+        if (state?.isGroup == true) {
+            Text(
+                text = if (isOn) "ACTIF" else "INACTIF",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
 @Composable
 private fun Sparkline(values: List<Float>, color: Color, modifier: Modifier = Modifier) {
     if (values.size < 2) return
@@ -511,18 +608,6 @@ private fun Sparkline(values: List<Float>, color: Color, modifier: Modifier = Mo
     }
 }
 
-private fun iconForSensorKind(kind: SensorKind): ImageVector = when (kind) {
-    SensorKind.TEMPERATURE -> Icons.Filled.Thermostat
-    SensorKind.HUMIDITY -> Icons.Filled.WaterDrop
-    SensorKind.RAIN -> Icons.Filled.WaterDrop
-    SensorKind.WIND -> Icons.Filled.Air
-    SensorKind.UV -> Icons.Filled.WbSunny
-    SensorKind.BAROMETER -> Icons.Filled.Speed
-    SensorKind.PERCENTAGE -> Icons.Filled.PieChart
-    SensorKind.ENERGY -> Icons.Filled.Bolt
-    SensorKind.GENERIC -> Icons.Filled.Info
-}
-
 private fun tintForSensorKind(kind: SensorKind): Color = when (kind) {
     SensorKind.TEMPERATURE -> AccentOrange
     SensorKind.HUMIDITY -> AccentBlueMuted
@@ -540,26 +625,15 @@ private fun CameraContent(config: WidgetConfig, state: WidgetLiveState.Camera?) 
     val snapshotUrl = config.source?.url?.takeIf { it.isNotBlank() }
     val rtspUrl = config.source?.rtspUrl?.takeIf { it.isNotBlank() }
     val refreshMs = ((config.source?.refreshSeconds ?: 15).coerceAtLeast(5)) * 1000L
+    val contentScale = if (config.source?.imageScale == "fit") ContentScale.Fit else ContentScale.Crop
 
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            snapshotUrl != null -> SnapshotImage(snapshotUrl, refreshMs)
-            rtspUrl != null -> RtspFallbackThumbnail(rtspUrl, refreshMs)
+            snapshotUrl != null -> SnapshotImage(snapshotUrl, refreshMs, contentScale)
+            rtspUrl != null -> RtspFallbackThumbnail(rtspUrl, refreshMs, contentScale)
             else -> CameraPlaceholder()
         }
 
-        if (state?.isLive == true) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(6.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(SurfaceDark)
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(text = "LIVE", color = AccentRed, fontSize = 10.sp)
-            }
-        }
         Text(
             text = state?.label ?: config.label ?: "Camera",
             color = TextPrimary,
@@ -571,25 +645,49 @@ private fun CameraContent(config: WidgetConfig, state: WidgetLiveState.Camera?) 
 
 /** Snapshot HTTP, rafraichi periodiquement (cache-busting simple sur l'url). */
 @Composable
-private fun SnapshotImage(url: String, refreshMs: Long) {
-    var tick by remember { mutableStateOf(0L) }
+private fun SnapshotImage(url: String, refreshMs: Long, contentScale: ContentScale) {
+    var tick by remember(url) { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(url, refreshMs) {
         while (true) {
-            tick = System.currentTimeMillis()
             delay(refreshMs)
+            tick = System.currentTimeMillis()
         }
     }
     val bustedUrl = remember(url, tick) {
         if (url.contains("?")) "$url&_t=$tick" else "$url?_t=$tick"
     }
-    AsyncImage(
-        model = bustedUrl,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .fillMaxSize()
-            .clip(RoundedCornerShape(10.dp))
-    )
+
+    // On garde le dernier painter réussi pour l'utiliser en fond pendant
+    // que la nouvelle image charge, garantissant un rafraîchissement
+    // sans aucun flickering (zéro flash).
+    var lastSuccessPainter by remember(url) { mutableStateOf<Painter?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (lastSuccessPainter != null) {
+            Image(
+                painter = lastSuccessPainter!!,
+                contentDescription = null,
+                contentScale = contentScale,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(bustedUrl)
+                .memoryCacheKey(url) // Clé stable pour partage avec la modale
+                .diskCacheKey(url)
+                .memoryCachePolicy(CachePolicy.WRITE_ONLY)
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .crossfade(false)
+                .build(),
+            contentDescription = null,
+            contentScale = contentScale,
+            onSuccess = { state ->
+                lastSuccessPainter = state.painter
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    }
 }
 
 /**
@@ -601,13 +699,13 @@ private fun SnapshotImage(url: String, refreshMs: Long) {
  * ce n'est pas bloquant.
  */
 @Composable
-private fun RtspFallbackThumbnail(rtspUrl: String, refreshMs: Long) {
+private fun RtspFallbackThumbnail(rtspUrl: String, refreshMs: Long, contentScale: ContentScale) {
     val context = LocalContext.current
     var thumbnail by remember { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(rtspUrl) {
         val grabber = RtspThumbnailGrabber(context)
-        val effectiveInterval = refreshMs.coerceAtLeast(30_000L)
+        val effectiveInterval = refreshMs.coerceAtLeast(5_000L)
         while (true) {
             val bitmap = runCatching { grabber.capture(rtspUrl) }.getOrNull()
             if (bitmap != null) thumbnail = bitmap
@@ -620,10 +718,9 @@ private fun RtspFallbackThumbnail(rtspUrl: String, refreshMs: Long) {
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = contentScale,
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(10.dp))
         )
     } else {
         CameraPlaceholder()
@@ -644,11 +741,37 @@ private fun CameraPlaceholder() {
 }
 
 @Composable
-private fun EmptyContent(label: String?) {
-    Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxSize()) {
-        WidgetIcon(Icons.Filled.QuestionMark, TextMuted)
-        Text(text = label ?: "?", color = TextMuted, fontSize = 11.sp)
+private fun EmptyContent() {
+    Icon(Icons.Filled.QuestionMark, contentDescription = null, tint = TextMuted)
+}
+
+@Composable
+private fun LocalIconButton(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(SurfaceVariantDark)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
     }
+}
+
+private fun splitValueAndUnit(displayValue: String): Pair<String, String?> {
+    val trimmed = displayValue.trim()
+    val firstSpace = trimmed.indexOf(' ')
+    if (firstSpace != -1) {
+        val value = trimmed.substring(0, firstSpace)
+        val unit = trimmed.substring(firstSpace + 1).trim()
+        return value to unit
+    }
+    // Cas spécial pour les valeurs collées type "25C" ou "60%"
+    val lastDigit = trimmed.indexOfLast { it.isDigit() }
+    if (lastDigit != -1 && lastDigit < trimmed.length - 1) {
+        return trimmed.substring(0, lastDigit + 1) to trimmed.substring(lastDigit + 1)
+    }
+    return trimmed to null
 }
 
 @Composable

@@ -34,6 +34,15 @@ object DomoticzTypeMapper {
 
             switchType.contains("Dimmer", ignoreCase = true) -> WidgetType.DIMMER
 
+            switchType.contains("Motion", ignoreCase = true) ||
+                switchType.contains("Presence", ignoreCase = true) ||
+                switchType.contains("Occupancy", ignoreCase = true) ||
+                switchType.contains("Smoke", ignoreCase = true) ||
+                switchType.contains("Water", ignoreCase = true) ||
+                switchType.contains("Leak", ignoreCase = true) ||
+                switchType.contains("Contact", ignoreCase = true) ||
+                type.contains("Sensor", ignoreCase = true) -> WidgetType.BINARY_SENSOR
+
             // Capteurs génériques : couvre la plupart des types de capteurs
             // Domoticz qui ne rentrent dans aucune autre catégorie
             // (température seule, humidité, pluie, vent, UV, baromètre,

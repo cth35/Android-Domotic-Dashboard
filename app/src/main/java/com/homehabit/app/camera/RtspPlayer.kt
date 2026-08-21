@@ -24,8 +24,7 @@ class RtspPlayer(context: Context) {
         context,
         arrayListOf(
             "--no-audio",
-            "--network-caching=300",
-            "--rtsp-tcp"
+            "--network-caching=1500"
         )
     )
 
@@ -47,13 +46,24 @@ class RtspPlayer(context: Context) {
     }
 
     fun attachViews(layout: VLCVideoLayout) {
-        mediaPlayer.attachViews(layout, null, false, false)
+        // On utilise TextureView (3eme param = true) pour permettre des transitions
+        // fluides et des overlays sans flash noir (respecte l'alpha et le Z-order).
+        mediaPlayer.attachViews(layout, null, true, false)
+        mediaPlayer.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
     }
 
     fun play(rtspUrl: String) {
         _state.value = RtspPlaybackState.CONNECTING
         val media = Media(libVLC, Uri.parse(rtspUrl))
+        // Options de stabilité pour le réseau local
+        media.addOption(":network-caching=1500")
+        media.addOption(":rtsp-tcp")
+        media.addOption(":clock-jitter=0")
+        media.addOption(":clock-synchro=0")
+        
+        // On garde l'accélération matérielle pour la vidéo plein écran (surface visible)
         media.setHWDecoderEnabled(true, false)
+
         mediaPlayer.media = media
         media.release()
         mediaPlayer.play()

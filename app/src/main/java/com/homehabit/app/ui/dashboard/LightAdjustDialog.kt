@@ -6,11 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,11 +24,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.homehabit.app.ui.theme.AccentBlue
 import com.homehabit.app.ui.theme.SurfaceDark
 import com.homehabit.app.ui.theme.SurfaceVariantDark
 import com.homehabit.app.ui.theme.TextPrimary
 import com.homehabit.app.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /**
  * Palette de presets plutot qu'un vrai color picker HSV : suffisant pour
@@ -85,27 +86,29 @@ fun LightAdjustDialog(
 
                 Spacer(Modifier.height(16.dp))
                 Text(text = "Luminosite", color = TextSecondary, fontSize = 11.sp)
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp)
                 ) {
-                    IconButton(onClick = {
-                        brightness = (brightness - 10).coerceAtLeast(0)
-                        onBrightnessChange(brightness)
-                        lastActionAt = System.currentTimeMillis()
-                    }) {
-                        Icon(Icons.Filled.Remove, contentDescription = "Diminuer", tint = TextPrimary)
-                    }
-                    Text(text = "$brightness%", color = TextPrimary, fontSize = 24.sp)
-                    IconButton(onClick = {
-                        brightness = (brightness + 10).coerceAtMost(100)
-                        onBrightnessChange(brightness)
-                        lastActionAt = System.currentTimeMillis()
-                    }) {
-                        Icon(Icons.Filled.Add, contentDescription = "Augmenter", tint = TextPrimary)
-                    }
+                    Slider(
+                        value = brightness.toFloat(),
+                        onValueChange = { 
+                            brightness = it.roundToInt()
+                            onBrightnessChange(brightness)
+                            lastActionAt = System.currentTimeMillis()
+                        },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = AccentBlue,
+                            activeTrackColor = AccentBlue,
+                            inactiveTrackColor = SurfaceVariantDark
+                        )
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text(text = "$brightness%", color = TextPrimary, fontSize = 18.sp, modifier = Modifier.width(45.dp))
                 }
 
                 if (isColorLight) {

@@ -75,6 +75,8 @@ class ConfigHttpServer(
                         call.respondText("Non autorise", ContentType.Text.Plain, HttpStatusCode.Unauthorized)
                         return@get
                     }
+                    // Force la desactivation du cache pour eviter de voir une ancienne config
+                    call.response.headers.append("Cache-Control", "no-cache, no-store, must-revalidate")
                     call.respondText(
                         repository.serialize(repository.current()),
                         ContentType.Application.Json
