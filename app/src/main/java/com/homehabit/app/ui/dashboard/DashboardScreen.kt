@@ -74,6 +74,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     var showSettingsDialog by remember { mutableStateOf(false) }
     var cameraModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var thermostatModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
+    var weatherModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var lightModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var managePageIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -145,6 +146,8 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                             sparkline = sparklines[widgetConfig.id],
                             onClick = when {
                                 isEditMode -> null
+                                widgetConfig.widgetType == WidgetType.WEATHER || widgetConfig.widgetType == WidgetType.FORECAST ->
+                                    { { weatherModalWidget = widgetConfig } }
                                 widgetConfig.widgetType == WidgetType.LIGHT ->
                                     { { viewModel.toggleLight(widgetConfig.id) } }
                                 isDimmableLight ->
@@ -304,11 +307,30 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
         )
     }
 
+    weatherModalWidget?.let { widget ->
+        val state = widgetStates[widget.id]?.state
+        if (state is WidgetLiveState.Weather) {
+            WeatherDetailsModal(
+                label = widget.label ?: "Météo",
+                state = state,
+                onDismiss = { weatherModalWidget = null }
+            )
+        } else if (state is WidgetLiveState.Forecast) {
+            ForecastDetailsModal(
+                label = widget.label ?: "Prévision 7 jours",
+                state = state,
+                onDismiss = { weatherModalWidget = null }
+            )
+        }
+    }
+
     lightModalWidget?.let { widget ->
         val light = widgetStates[widget.id]?.state as? WidgetLiveState.Light
         LightAdjustDialog(
             label = widget.label ?: "Lumiere",
-            isColorLight = widget.widgetType == WidgetType.COLOR_LIGHT,
+            // On se base sur l'etat live pour savoir quoi afficher
+            isColorLight = light?.isColor == true,
+            isWhiteTunable = light?.isWhiteTunable == true,
             currentBrightness = light?.brightness ?: 100,
             currentColorHex = light?.colorHex,
             onBrightnessChange = { percent -> viewModel.setBrightness(widget.id, percent) },

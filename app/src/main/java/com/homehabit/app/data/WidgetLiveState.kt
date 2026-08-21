@@ -10,11 +10,18 @@ sealed class WidgetLiveState {
         val temperature: Int,
         val condition: String,
         val min: Int,
-        val max: Int
+        val max: Int,
+        val weatherCode: Int? = null,
+        val humidity: Int? = null,
+        val windSpeed: Double? = null,
+        val sunrise: String? = null, // "HH:mm"
+        val sunset: String? = null    // "HH:mm"
     ) : WidgetLiveState()
 
     data class Light(
         val isOn: Boolean,
+        val isColor: Boolean = false,         // True si supporte le RGB
+        val isWhiteTunable: Boolean = false,  // True si supporte les nuances de blanc (WW)
         val brightness: Int? = null,   // 0-100, null si le device n'est pas dimmable
         val colorHex: String? = null   // "#RRGGBB", null si pas de couleur ou non determinable
     ) : WidgetLiveState()
@@ -71,7 +78,11 @@ data class ForecastDay(
     val condition: String,
     val weatherCode: Int?,
     val tempMin: Int,
-    val tempMax: Int
+    val tempMax: Int,
+    val sunrise: String? = null,
+    val sunset: String? = null,
+    val precipProb: Int? = null,
+    val windSpeed: Double? = null
 )
 
 object FakeStateProvider {

@@ -209,15 +209,24 @@ class DomoticzRepository(private val client: DomoticzClient) {
         when (type) {
             WidgetType.LIGHT, WidgetType.DIMMER, WidgetType.COLOR_LIGHT -> {
                 val status = device.Status.orEmpty()
-                // Une lumiere est allumee si son statut n'est pas explicitement "Off"
-                // et qu'elle a un statut connu. On evite de se baser uniquement sur Level 
-                // car Domoticz garde souvent le dernier niveau en memoire meme eteint.
                 val isOn = !status.equals("Off", ignoreCase = true) && status.isNotBlank()
+
+                val subType = device.SubType.orEmpty()
+                val isActuallyColor = device.Type?.contains("Color Switch", ignoreCase = true) == true &&
+                    subType.contains("RGB", ignoreCase = true)
+                
+                // On considere "White Tunable" les devices Color Switch qui ont "WW" dans leur sous-type
+                // ou qui supportent le RGB (les RGB supportent generalement le blanc variable).
+                val isWhiteTunable = device.Type?.contains("Color Switch", ignoreCase = true) == true &&
+                    (subType.contains("WW", ignoreCase = true) || isActuallyColor)
 
                 WidgetLiveState.Light(
                     isOn = isOn,
+                    isColor = isActuallyColor,
+                    isWhiteTunable = isWhiteTunable,
                     brightness = if (type != WidgetType.LIGHT) device.Level else null,
-                    colorHex = if (type == WidgetType.COLOR_LIGHT) DomoticzColorParser.parseToHex(device.Color) else null
+                    // On extrait la couleur pour tout le monde (RGB ou WW)
+                    colorHex = DomoticzColorParser.parseToHex(device.Color)
                 )
             }
 

@@ -4,13 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Domoticz encode la couleur d'un device dans un champ "Color" qui est
- * lui-meme une chaine JSON (ex: {"m":3,"t":0,"r":255,"g":100,"b":50}),
- * avec un mode "m" (1=blanc, 2=temperature, 3=RGB, 4=custom...). On ne
- * gere ici que le cas RGB explicite (le plus courant pour une Hue en
- * mode couleur) : les modes blanc/temperature retombent sur `null`
- * (pas de swatch couleur affiche) plutot que d'inventer une teinte
- * approximative. Best-effort assume, comme pour le snapshot RTSP.
+ * Gère le parsing des couleurs Domoticz (RGB et Température de blanc).
  */
 object DomoticzColorParser {
 
@@ -18,13 +12,37 @@ object DomoticzColorParser {
 
     fun parseToHex(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
-        val dto = runCatching { json.decodeFromString(ColorDto.serializer(), raw) }.getOrNull() ?: return null
-        val r = dto.r
-        val g = dto.g
-        val b = dto.b
-        if (r == null || g == null || b == null) return null
-        if (r == 0 && g == 0 && b == 0) return null
-        return "#%02X%02X%02X".format(r.coerceIn(0, 255), g.coerceIn(0, 255), b.coerceIn(0, 255))
+        val dto = runCatching { json.decodeFromString<ColorDto>(raw) }.getOrNull() ?: return null
+        
+        return when (dto.m) {
+            3 -> { // Mode RGB
+                val r = dto.r ?: 0
+                val g = dto.g ?: 0
+                val b = dto.b ?: 0
+                if (r == 0 && g == 0 && b == 0) return null
+                "#%02X%02X%02X".format(r.coerceIn(0, 255), g.coerceIn(0, 255), b.coerceIn(0, 255))
+            }
+            2 -> { // Mode Température de blanc (WW)
+                // t va de 0 (froid) à 255 (chaud) ou inversement selon le hardware.
+                // On fait une approximation visuelle pour le dashboard.
+                val temp = dto.t ?: 128
+                approximateWhiteTempToHex(temp)
+            }
+            else -> null
+        }
+    }
+
+    /**
+     * Convertit une valeur de température Domoticz (0-255) en couleur hexadécimale
+     * pour l'affichage visuel (ambiance chaude à froide).
+     */
+    private fun approximateWhiteTempToHex(t: Int): String {
+        val factor = t.coerceIn(0, 255) / 255f
+        // Dégradé de #D1EAFF (froid, t=0) vers #FFAE00 (chaud, t=255)
+        val r = (209 + (255 - 209) * factor).toInt()
+        val g = (234 + (174 - 234) * factor).toInt()
+        val b = (255 + (0 - 255) * factor).toInt()
+        return "#%02X%02X%02X".format(r, g, b)
     }
 
     fun hexToRgb(hex: String): Triple<Int, Int, Int> {
@@ -37,9 +55,12 @@ object DomoticzColorParser {
 
     @Serializable
     private data class ColorDto(
-        val m: Int? = null,
+        val m: Int? = null, // Mode
         val r: Int? = null,
         val g: Int? = null,
-        val b: Int? = null
+        val b: Int? = null,
+        val t: Int? = null, // Temperature
+        val ww: Int? = null, // Warm white level
+        val cw: Int? = null  // Cold white level
     )
 }

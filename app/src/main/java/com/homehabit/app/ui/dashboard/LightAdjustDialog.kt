@@ -37,17 +37,21 @@ import kotlin.math.roundToInt
  * une Hue, plus simple a utiliser au doigt sur un ecran mural.
  */
 private val COLOR_PRESETS = listOf(
-    "#FFE9C6", "#F5F8FF", "#FF3B30", "#FF9500", "#FFD60A",
-    "#34C759", "#0A84FF", "#AF52DE", "#FF2D9B"
+    "#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#0A84FF", "#AF52DE", "#FF2D9B"
+)
+
+private val WHITE_PRESETS = listOf(
+    "#FFAE00", "#FFD27D", "#FFE9C6", "#F5F8FF", "#D1EAFF"
 )
 
 /** Delai d'inactivite avant fermeture automatique, apres la derniere action (brightness ou couleur). */
-private const val AUTO_CLOSE_DELAY_MS = 1_500L
+private const val AUTO_CLOSE_DELAY_MS = 2_000L
 
 @Composable
 fun LightAdjustDialog(
     label: String,
     isColorLight: Boolean,
+    isWhiteTunable: Boolean,
     currentBrightness: Int,
     currentColorHex: String?,
     onBrightnessChange: (Int) -> Unit,
@@ -56,11 +60,6 @@ fun LightAdjustDialog(
 ) {
     var brightness by remember { mutableStateOf(currentBrightness.coerceIn(0, 100)) }
 
-    // Se relance a chaque action (brightness +/- ou couleur) grace a la
-    // cle sur lastActionAt : un tap rapproche n'annule pas la fermeture,
-    // il la reporte simplement. Permet d'enchainer plusieurs taps +/-
-    // sans que la modale ne se ferme entre deux, tout en fermant seule
-    // des que l'utilisateur arrete d'interagir.
     var lastActionAt by remember { mutableStateOf(0L) }
     LaunchedEffect(lastActionAt) {
         if (lastActionAt > 0L) {
@@ -111,39 +110,37 @@ fun LightAdjustDialog(
                     Text(text = "$brightness%", color = TextPrimary, fontSize = 18.sp, modifier = Modifier.width(45.dp))
                 }
 
-                if (isColorLight) {
+                if (isWhiteTunable) {
                     Spacer(Modifier.height(20.dp))
-                    Text(text = "Couleur", color = TextSecondary, fontSize = 11.sp)
+                    Text(text = "Nuances de blanc", color = TextSecondary, fontSize = 11.sp)
                     Spacer(Modifier.height(8.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        COLOR_PRESETS.forEach { hex ->
-                            val isSelected = hex.equals(currentColorHex, ignoreCase = true)
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(android.graphics.Color.parseColor(hex)))
-                                    .clickable {
-                                        onColorChange(hex)
-                                        lastActionAt = System.currentTimeMillis()
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isSelected) {
-                                    Icon(
-                                        Icons.Filled.Check,
-                                        contentDescription = "Selectionne",
-                                        tint = Color.Black.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
+                        WHITE_PRESETS.forEach { hex ->
+                            ColorPresetButton(hex, currentColorHex) {
+                                onColorChange(hex)
+                                lastActionAt = System.currentTimeMillis()
                             }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                if (isColorLight) {
+                    Spacer(Modifier.height(20.dp))
+                    Text(text = "Couleurs", color = TextSecondary, fontSize = 11.sp)
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        COLOR_PRESETS.forEach { hex ->
+                            ColorPresetButton(hex, currentColorHex) {
+                                onColorChange(hex)
+                                lastActionAt = System.currentTimeMillis()
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
 
                 Box(
                     modifier = Modifier
@@ -155,6 +152,32 @@ fun LightAdjustDialog(
                     Text("Fermer", color = TextPrimary, fontSize = 13.sp)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ColorPresetButton(
+    hex: String,
+    currentHex: String?,
+    onClick: () -> Unit
+) {
+    val isSelected = hex.equals(currentHex, ignoreCase = true)
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(Color(android.graphics.Color.parseColor(hex)))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isSelected) {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = "Selectionne",
+                tint = Color.Black.copy(alpha = 0.6f),
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }

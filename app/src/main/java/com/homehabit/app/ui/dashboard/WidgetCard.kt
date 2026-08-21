@@ -5,7 +5,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -26,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -356,7 +357,7 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
 }
 
 /** Mapping large des codes WMO vers une icone — meme esprit que WeatherCodeMapper mais pour le glyphe plutot que le libelle. */
-private fun iconForWeatherCode(code: Int?): ImageVector = when (code) {
+internal fun iconForWeatherCode(code: Int?): ImageVector = when (code) {
     0 -> Icons.Filled.WbSunny
     1, 2, 3 -> Icons.Filled.Cloud
     45, 48 -> Icons.Filled.Cloud
@@ -369,20 +370,40 @@ private fun iconForWeatherCode(code: Int?): ImageVector = when (code) {
 @Composable
 private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
     val isOn = state?.isOn == true
-    val isColorLight = config.widgetType == WidgetType.COLOR_LIGHT
     
-    val swatchColor = if (isColorLight && isOn) {
+    // On affiche la couleur/nuance si disponible dans l'état, 
+    // quel que soit le type de widget (RGB ou WW).
+    val swatchColor = if (isOn) {
         state?.colorHex?.let { hex ->
             runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrNull()
         }
     } else null
 
+    val isColorLight = config.widgetType == WidgetType.COLOR_LIGHT && state?.isColor == true
     val color = if (isOn) AccentGreen else TextMuted
     
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
                 .size(44.dp)
+                // On retire le clip ici pour permettre à la lueur de déborder
+                .drawBehind {
+                    if (isOn) {
+                        val glowColor = (swatchColor ?: color)
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    glowColor.copy(alpha = 0.6f),
+                                    glowColor.copy(alpha = 0.2f),
+                                    Color.Transparent
+                                ),
+                                center = center,
+                                radius = size.minDimension * 0.8f
+                            ),
+                            radius = size.minDimension * 0.8f
+                        )
+                    }
+                }
                 .clip(CircleShape)
                 .background(if (isOn) (swatchColor ?: color).copy(alpha = 0.3f) else SurfaceVariantDark),
             contentAlignment = Alignment.Center

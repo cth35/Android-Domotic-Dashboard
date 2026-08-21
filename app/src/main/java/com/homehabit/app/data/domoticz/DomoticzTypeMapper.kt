@@ -28,9 +28,18 @@ object DomoticzTypeMapper {
                 switchType.contains("Thermostat", ignoreCase = true) -> WidgetType.THERMOSTAT
 
             // Domoticz expose les lumieres RGB/RGBW (Hue et similaires) sous
-            // Type = "Color Switch", quel que soit le protocole (Hue Bridge,
-            // Zigbee, etc.)
-            type.contains("Color Switch", ignoreCase = true) -> WidgetType.COLOR_LIGHT
+            // Type = "Color Switch". On affine selon le SubType pour eviter
+            // de traiter les lampes "WW" (Warm White) ou "Switch" (White simple)
+            // comme du RGB.
+            type.contains("Color Switch", ignoreCase = true) -> {
+                val subType = device.SubType.orEmpty()
+                if (subType.contains("RGB", ignoreCase = true)) {
+                    WidgetType.COLOR_LIGHT
+                } else {
+                    // Fallback sur DIMMER pour les lampes WW ou Switch simple
+                    WidgetType.DIMMER
+                }
+            }
 
             switchType.contains("Dimmer", ignoreCase = true) -> WidgetType.DIMMER
 
