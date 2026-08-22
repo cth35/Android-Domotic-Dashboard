@@ -1,9 +1,9 @@
 package com.homehabit.app.data
 
 /**
- * Représente l'état "live" d'un widget. Pour le moment ces valeurs sont
- * générées en dur ; elles seront remplacées par les données réelles issues
- * du client Domoticz (json.htm) et du client météo (Open-Meteo).
+ * Represents the "live" state of a widget. For now these values are
+ * hardcoded; they will be replaced by actual data from the
+ * Domoticz client (json.htm) and the weather client (Open-Meteo).
  */
 sealed class WidgetLiveState {
     data class Weather(
@@ -20,10 +20,10 @@ sealed class WidgetLiveState {
 
     data class Light(
         val isOn: Boolean,
-        val isColor: Boolean = false,         // True si supporte le RGB
-        val isWhiteTunable: Boolean = false,  // True si supporte les nuances de blanc (WW)
-        val brightness: Int? = null,   // 0-100, null si le device n'est pas dimmable
-        val colorHex: String? = null   // "#RRGGBB", null si pas de couleur ou non determinable
+        val isColor: Boolean = false,         // True if RGB is supported
+        val isWhiteTunable: Boolean = false,  // True if shades of white (WW) are supported
+        val brightness: Int? = null,   // 0-100, null if the device is not dimmable
+        val colorHex: String? = null   // "#RRGGBB", null if no color or not determinable
     ) : WidgetLiveState()
 
     data class Thermostat(val temperature: Float) : WidgetLiveState()
@@ -35,12 +35,12 @@ sealed class WidgetLiveState {
     data class Camera(val isLive: Boolean, val label: String) : WidgetLiveState()
 
     /**
-     * Capteur générique (temp, humidité, pluie, vent, UV, baromètre,
-     * énergie, etc.). displayValue reprend directement le champ "Data"
-     * de Domoticz (déjà formaté avec unité, ex "21.5 C"). gaugePercent
-     * n'est renseigné que pour les grandeurs naturellement bornées 0-100
-     * (humidité, pourcentage) — pour tout le reste, une jauge inventerait
-     * une échelle arbitraire, donc null plutôt qu'une fausse précision.
+     * Generic sensor (temp, humidity, rain, wind, UV, barometer,
+     * energy, etc.). displayValue directly takes the "Data" field
+     * from Domoticz (already formatted with unit, e.g., "21.5 C"). gaugePercent
+     * is only filled for naturally bounded values 0-100
+     * (humidity, percentage) — for everything else, a gauge would invent
+     * an arbitrary scale, so null rather than false precision.
      */
     data class Sensor(
         val displayValue: String,
@@ -54,23 +54,23 @@ sealed class WidgetLiveState {
     ) : WidgetLiveState()
 
     /**
-     * Scene ou groupe Domoticz declenche en un tap. isGroup distingue les
-     * deux : un Group a un vrai etat on/off togglable, une Scene est un
-     * declencheur sans etat persistant (toujours "Off" au repos meme
-     * juste apres declenchement) — isOn n'a donc de sens durable que pour
-     * un Group.
+     * Domoticz scene or group triggered with one tap. isGroup distinguishes the
+     * two: a Group has a real togglable on/off state, a Scene is a
+     * trigger without persistent state (always "Off" at rest even
+     * right after triggering) — isOn therefore only has lasting meaning for
+     * a Group.
      */
     data class Scene(val isGroup: Boolean, val isOn: Boolean) : WidgetLiveState()
 
-    /** Prevision 7 jours (widget FORECAST), Open-Meteo. */
+    /** 7-day forecast (FORECAST widget), Open-Meteo. */
     data class Forecast(val days: List<ForecastDay>) : WidgetLiveState()
 
     object Empty : WidgetLiveState()
 }
 
 /**
- * Un jour de la prevision. dayLabel est deja forme ("Lun", "Mar"...),
- * pas de logique de formatage a refaire cote UI.
+ * One day of the forecast. dayLabel is already formed ("Mon", "Tue"...),
+ * no formatting logic to redo on the UI side.
  */
 data class ForecastDay(
     val dateIso: String,
@@ -88,8 +88,8 @@ data class ForecastDay(
 object FakeStateProvider {
 
     /**
-     * Seule la camera reste en demo : la meteo a maintenant son vrai
-     * client (Open-Meteo), Domoticz gere light/thermostat/shutter/lock.
+     * Only the camera remains in demo: the weather now has its real
+     * client (Open-Meteo), Domoticz handles light/thermostat/shutter/lock.
      */
     fun defaultStates(now: Long = System.currentTimeMillis()): Map<String, WidgetStateEntry> = mapOf(
         "cam_jardin" to WidgetStateEntry(

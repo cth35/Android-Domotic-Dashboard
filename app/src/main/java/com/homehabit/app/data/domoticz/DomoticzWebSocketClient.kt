@@ -23,9 +23,9 @@ import java.util.concurrent.TimeUnit
 private const val TAG = "DomoticzWebSocket"
 
 /**
- * Evenements emis par la connexion websocket Domoticz. Contrairement au
- * polling REST (getdevices), qui renvoie toujours la liste complete,
- * Domoticz pousse ici UN device a la fois, au moment ou il change.
+ * Events emitted by the Domoticz websocket connection. Unlike
+ * REST polling (getdevices), which always returns the complete list,
+ * Domoticz pushes ONE device here at a time, at the moment it changes.
  */
 sealed class DomoticzWsEvent {
     data object Connected : DomoticzWsEvent()
@@ -35,26 +35,26 @@ sealed class DomoticzWsEvent {
 }
 
 /**
- * Client du canal de push temps reel de Domoticz (endpoint /json,
- * disponible depuis la 2020.1 / build 4.11000). Complementaire de
- * DomoticzClient (REST) : sert uniquement a RECEVOIR les changements
- * d'etat en direct. Les commandes (switchlight, setsetpoint...) restent
- * envoyees en HTTP classique via DomoticzClient — le canal websocket de
- * Domoticz n'est pas garanti fiable dans le sens client -> serveur.
+ * Client of the Domoticz real-time push channel (endpoint /json,
+ * available since 2020.1 / build 4.11000). Complementary to
+ * DomoticzClient (REST): serves only to RECEIVE state changes
+ * live. Commands (switchlight, setsetpoint...) remain
+ * sent via classic HTTP through DomoticzClient — the websocket channel of
+ * Domoticz is not guaranteed reliable in the client -> server direction.
  *
- * Sous-protocole attendu par le serveur : "domoticz" (code en dur cote
- * Domoticz, cf. `#define websocket_protocol "domoticz"` dans son
- * cWebem.cpp). L'authentification Basic, si configuree, doit etre
- * envoyee des le handshake HTTP initial (header Authorization), pas
- * apres — Domoticz refuse sinon l'upgrade.
+ * Sub-protocol expected by the server: "domoticz" (hardcoded on the
+ * Domoticz side, cf. `#define websocket_protocol "domoticz"` in its
+ * cWebem.cpp). Basic authentication, if configured, must be
+ * sent right from the initial HTTP handshake (Authorization header), not
+ * after — Domoticz refuses the upgrade otherwise.
  *
- * Format des messages recus : NON documente officiellement. Best-effort
- * deduit du client web officiel / du projet Dashticz : un objet JSON par
- * device modifie, avec sensiblement les memes champs que
- * DomoticzDeviceDto (idx, Data, nValue, LastUpdate...). A valider sur le
- * terrain via les logs (tag "DomoticzWebSocket", niveau debug) si le
- * mapping semble incomplet sur une version Domoticz donnee : les logs
- * affichent la trame brute recue avant tout parsing.
+ * Format of received messages: NOT officially documented. Best-effort
+ * deduced from the official web client / the Dashticz project: one JSON object per
+ * modified device, with substantially the same fields as
+ * DomoticzDeviceDto (idx, Data, nValue, LastUpdate...). To be validated in the
+ * field via logs (tag "DomoticzWebSocket", debug level) if the
+ * mapping seems incomplete on a given Domoticz version: the logs
+ * display the raw frame received before any parsing.
  */
 class DomoticzWebSocketClient(private val config: DomoticzConfig) {
 
@@ -65,20 +65,20 @@ class DomoticzWebSocketClient(private val config: DomoticzConfig) {
     }
 
     private val okHttpClient = OkHttpClient.Builder()
-        // Garde la connexion vivante malgre les routeurs/box qui coupent
-        // les connexions TCP inactives sur un reseau domestique.
+        // Keeps the connection alive despite routers/boxes that cut
+        // inactive TCP connections on a home network.
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
 
     private var webSocket: WebSocket? = null
 
     /**
-     * Flow d'evenements avec reconnexion automatique et backoff
-     * exponentiel (1s -> 2s -> 5s -> 10s -> plafonne a 30s) en cas
-     * d'echec ou de fermeture. Un seul socket actif a la fois : ne pas
-     * collecter ce Flow depuis plusieurs endroits en parallele (utiliser
-     * DomoticzRepository.observeLiveUpdates comme point d'entree unique
-     * cote appelant).
+     * Event flow with automatic reconnection and exponential
+     * backoff (1s -> 2s -> 5s -> 10s -> caps at 30s) in case
+     * of failure or closure. Only one active socket at a time: do not
+     * collect this Flow from multiple places in parallel (use
+     * DomoticzRepository.observeLiveUpdates as a single entry point
+     * on the caller side).
      */
     fun observeEvents(): Flow<DomoticzWsEvent> = callbackFlow {
         var manuallyClosed = false
@@ -119,18 +119,18 @@ class DomoticzWebSocketClient(private val config: DomoticzConfig) {
                 object : WebSocketListener() {
                     override fun onOpen(ws: WebSocket, response: Response) {
                         Log.i(TAG, "Connecte a $url")
-                        retryDelayMs = 1_000L // reset du backoff des qu'une connexion reussit
+                        retryDelayMs = 1_000L // backoff reset as soon as a connection succeeds
                         trySend(DomoticzWsEvent.Connected)
                     }
 
                     override fun onMessage(ws: WebSocket, text: String) {
-                        Log.d(TAG, "Message recu: $text")
+                        //Log.d(TAG, "Message recu: $text")
                         try {
                             val root = json.parseToJsonElement(text).jsonObject
                             val event = root["event"]?.jsonPrimitive?.content
                             
                             if (event == "response") {
-                                // Domoticz renvoie parfois les updates dans un champ "data" (string JSON)
+                                // Domoticz sometimes returns updates in a "data" field (JSON string)
                                 val dataStr = root["data"]?.jsonPrimitive?.content
                                 if (dataStr != null) {
                                     val dataObj = json.parseToJsonElement(dataStr).jsonObject
@@ -141,7 +141,7 @@ class DomoticzWebSocketClient(private val config: DomoticzConfig) {
                                     }
                                 }
                             } else if (root.containsKey("idx")) {
-                                // Format direct (attendu initialement)
+                                // Direct format (initially expected)
                                 val device = json.decodeFromJsonElement<DomoticzDeviceDto>(root)
                                 trySend(DomoticzWsEvent.DeviceUpdate(device))
                             } else {
@@ -176,7 +176,7 @@ class DomoticzWebSocketClient(private val config: DomoticzConfig) {
         }
     }
 
-    /** A appeler explicitement quand le client n'est plus utilise (hot swap de config, onCleared). */
+    /** To be called explicitly when the client is no longer used (hot swap config, onCleared). */
     fun close() {
         webSocket?.close(1000, "Client ferme")
         webSocket = null

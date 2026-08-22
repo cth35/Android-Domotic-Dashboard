@@ -7,8 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Alternative a RtspPlayer (libVLC) utilisant rtsp-client-android.
- * Plus leger et visant une latence minimale (zero-buffering).
+ * Alternative to RtspPlayer (libVLC) using rtsp-client-android.
+ * Lighter and aiming for minimal latency (zero-buffering).
  */
 class RtspPlayerNative {
 
@@ -39,7 +39,7 @@ class RtspPlayerNative {
 
             override fun onRtspStatusFailed(message: String?) {
                 _state.value = RtspPlaybackState.ERROR
-                // Tentative de reconnexion automatique en cas d'erreur (timeout, coupure reseau)
+                // Automatic reconnection attempt in case of error (timeout, network cut)
                 if (retryCount < maxRetries) {
                     retryCount++
                     view?.postDelayed({
@@ -50,7 +50,7 @@ class RtspPlayerNative {
 
             override fun onRtspFirstFrameRendered() {
                 _state.value = RtspPlaybackState.PLAYING
-                retryCount = 0 // Reset au premier succes
+                retryCount = 0 // Reset on first success
             }
 
             override fun onRtspFrameSizeChanged(width: Int, height: Int) {
@@ -64,7 +64,7 @@ class RtspPlayerNative {
         _state.value = RtspPlaybackState.CONNECTING
         
         val uri = Uri.parse(rtspUrl)
-        // socketTimeout non disponible en 5.3.0 dans init()
+        // socketTimeout not available in 5.3.0 in init()
         view.init(uri, null, null, "HomeHabit/1.0")
         view.debug = false
         view.start(true, false)

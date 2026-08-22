@@ -3,15 +3,15 @@ package com.homehabit.app.model
 import kotlinx.serialization.Serializable
 
 /**
- * Racine de la config. BREAKING CHANGE : avant multi-dashboard, la racine
- * avait directement `grid` + `widgets`. Desormais c'est une liste de
- * pages, chacune avec sa propre grille et ses propres widgets. Un
- * dashboard.json ecrit avec l'ancien format ne sera pas migre
- * automatiquement (les champs `grid`/`widgets` a plat seront ignores,
- * `pages` repartira sur son defaut) : a reinitialiser si necessaire.
+ * Root of the config. BREAKING CHANGE: before multi-dashboard, the root
+ * had `grid` + `widgets` directly. Now it is a list of
+ * pages, each with its own grid and widgets. A
+ * dashboard.json written in the old format will not be migrated
+ * automatically (flat `grid`/`widgets` fields will be ignored,
+ * `pages` will start from its default): to be reset if necessary.
  *
- * `settings` est additif (nouveau champ, valeur par defaut) : pas de
- * breaking change pour un fichier deja au format multi-pages.
+ * `settings` is additive (new field, default value): no
+ * breaking change for a file already in multi-page format.
  */
 @Serializable
 data class DashboardConfig(
@@ -20,11 +20,11 @@ data class DashboardConfig(
 )
 
 /**
- * Reglages globaux, persistes et editables depuis l'app (ecran de
- * reglages) ou depuis le navigateur (meme JSON que le reste de la
- * config). Volontairement plat pour l'instant : un seul serveur
- * Domoticz. Pas de reglage global pour la meteo, chaque widget porte
- * deja ses propres lat/lon (WidgetSource).
+ * Global settings, persisted and editable from the app (settings
+ * screen) or from the browser (same JSON as the rest of the
+ * config). Intentionally flat for now: a single Domoticz
+ * server. No global setting for weather, each widget already carries
+ * its own lat/lon (WidgetSource).
  */
 @Serializable
 data class AppSettings(
@@ -33,24 +33,24 @@ data class AppSettings(
     val domoticzUseHttps: Boolean = false,
     val domoticzUsername: String? = null,
     val domoticzPassword: String? = null,
-    // Genere automatiquement au premier lancement (ConfigRepository),
-    // jamais laisse vide en pratique. Protege le serveur HTTP embarque.
+    // Automatically generated at first launch (ConfigRepository),
+    // never left empty in practice. Protects the embedded HTTP server.
     val httpAuthToken: String = "",
 
-    // --- Mode nuit (assombrissement + extinction planifiee) ---
+    // --- Night mode (dimming + planned shutdown) ---
     val nightModeEnabled: Boolean = false,
-    val nightStartHour: Int = 22,   // 0-23, heure de debut (peut traverser minuit si > nightEndHour)
-    val nightEndHour: Int = 7,      // 0-23, heure de fin
-    val nightBrightness: Float = 0.03f,   // 0.01-1.0, luminosite pendant la nuit
-    // Extinction reelle (pas juste assombrissement) via droits
-    // administrateur — voir NightModeSchedule et DeviceAdmin. Desactive
-    // par defaut : necessite une action explicite de l'utilisateur pour
-    // accorder les droits, ne peut pas s'activer tout seul.
+    val nightStartHour: Int = 22,   // 0-23, start hour (can cross midnight if > nightStartHour)
+    val nightEndHour: Int = 7,      // 0-23, end hour
+    val nightBrightness: Float = 0.03f,   // 0.01-1.0, brightness during the night
+    // Actual shutdown (not just dimming) via administrator
+    // rights — see NightModeSchedule and DeviceAdmin. Disabled
+    // by default: requires an explicit action from the user to
+    // grant rights, cannot activate itself.
     val nightScreenOffEnabled: Boolean = false,
 
-    // --- Lecteur Video ---
-    // Si vrai, utilise rtsp-client-android (plus reactif, faible latence)
-    // au lieu de libVLC (plus stable sur flux difficiles).
+    // --- Video Player ---
+    // If true, uses rtsp-client-android (more reactive, low latency)
+    // instead of libVLC (more stable on difficult streams).
     val useRtspClientNative: Boolean = false
 )
 
@@ -65,7 +65,7 @@ data class DashboardPage(
 @Serializable
 data class GridConfig(
     val columns: Int = 6,
-    val rows: Int = 0 // 0 = mode scroll (hauteur libre), > 0 = mode fit (nombre fixe de lignes)
+    val rows: Int = 0 // 0 = scroll mode (free height), > 0 = fit mode (fixed number of rows)
 )
 
 @Serializable
@@ -85,12 +85,12 @@ data class WidgetConfig(
 @Serializable
 data class WidgetSource(
     val provider: String? = null,       // "domoticz", "open-meteo", "camera", ...
-    val deviceId: String? = null,       // ex "idx:12" pour Domoticz
-    val url: String? = null,            // uri du snapshot JPEG (widget camera au repos)
-    val rtspUrl: String? = null,        // uri RTSP (flux video plein ecran)
-    val refreshSeconds: Int? = null,    // frequence de rafraichissement du snapshot
-    val latitude: Double? = null,       // widget meteo (Open-Meteo travaille en lat/lon)
+    val deviceId: String? = null,       // e.g. "idx:12" for Domoticz
+    val url: String? = null,            // JPEG snapshot uri (camera widget at rest)
+    val rtspUrl: String? = null,        // RTSP uri (full-screen video stream)
+    val refreshSeconds: Int? = null,    // snapshot refresh frequency
+    val latitude: Double? = null,       // weather widget (Open-Meteo works in lat/lon)
     val longitude: Double? = null,
-    val shutterStyle: String? = null,   // "buttons" (defaut) ou "toggle", widget SHUTTER uniquement
-    val imageScale: String? = null      // "crop" (par defaut) ou "fit", widget CAMERA uniquement
+    val shutterStyle: String? = null,   // "buttons" (default) or "toggle", SHUTTER widget only
+    val imageScale: String? = null      // "crop" (default) or "fit", CAMERA widget only
 )

@@ -12,11 +12,11 @@ import org.videolan.libvlc.util.VLCVideoLayout
 enum class RtspPlaybackState { IDLE, CONNECTING, PLAYING, ERROR }
 
 /**
- * Une instance = une session de lecture RTSP. A creer/liberer avec le
- * cycle de vie de la modale plein ecran (pas de lecture en arriere-plan
- * pour l'instant : le flux ne tourne que quand la modale est ouverte,
- * important pour la charge CPU/reseau vu que l'ecran reste allume en
- * permanence).
+ * One instance = one RTSP playback session. To be created/released with the
+ * lifecycle of the full-screen modal (no background playback
+ * for now: the stream only runs when the modal is open,
+ * important for CPU/network load since the screen remains on
+ * permanently).
  */
 class RtspPlayer(context: Context) {
 
@@ -46,8 +46,8 @@ class RtspPlayer(context: Context) {
     }
 
     fun attachViews(layout: VLCVideoLayout) {
-        // On utilise TextureView (3eme param = true) pour permettre des transitions
-        // fluides et des overlays sans flash noir (respecte l'alpha et le Z-order).
+        // We use TextureView (3rd param = true) to allow smooth transitions
+        // and overlays without black flashes (respects alpha and Z-order).
         mediaPlayer.attachViews(layout, null, true, false)
         mediaPlayer.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
     }

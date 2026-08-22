@@ -12,27 +12,27 @@ import com.homehabit.app.model.AppSettings
 import java.util.Calendar
 
 /**
- * Planifie les alarmes d'extinction/rallumage via AlarmManager (survit
- * a une app en arriere-plan, contrairement a un simple delay() dans une
- * coroutine liee a l'Activity), et execute les actions elles-memes.
+ * Plans the off/on alarms via AlarmManager (survives
+ * a background app, unlike a simple delay() in a
+ * coroutine linked to the Activity), and executes the actions themselves.
  *
- * Best-effort assume, pas garanti :
- * - Necessite les droits Device Admin pour l'extinction reelle (voir
- *   HomeHabitDeviceAdminReceiver) — sans eux, l'alarme "off" ne fait
- *   rien (l'assombrissement seul reste actif, gere separement par
- *   NightModeEffect, toujours fiable lui).
- * - Les alarmes exactes (setExactAndAllowWhileIdle) necessitent la
- *   permission SCHEDULE_EXACT_ALARM sur Android 12+, potentiellement a
- *   accorder manuellement dans Parametres > Applications > Alarmes et
- *   rappels selon le fabricant.
- * - Les gestionnaires de batterie agressifs de certains fabricants
- *   (MIUI, Samsung...) peuvent tuer l'app en arriere-plan et empecher
- *   le declenchement, malgre l'alarme systeme.
- * - Le rallumage automatique peut atterrir sur l'ecran de verrouillage
- *   si l'appareil a un code/schema configure — recommande de ne pas en
- *   avoir sur un appareil dedie a l'affichage mural.
- * - Non teste sur device reel, comme le reste des integrations
- *   plateforme de ce projet.
+ * Best-effort assumed, not guaranteed:
+ * - Requires Device Admin rights for actual shutdown (see
+ *   HomeHabitDeviceAdminReceiver) — without them, the "off" alarm does
+ *   nothing (dimming alone remains active, managed separately by
+ *   NightModeEffect, which is always reliable).
+ * - Exact alarms (setExactAndAllowWhileIdle) require the
+ *   SCHEDULE_EXACT_ALARM permission on Android 12+, potentially to
+ *   be granted manually in Settings > Apps > Alarms &
+ *   reminders depending on the manufacturer.
+ * - Aggressive battery managers from some manufacturers
+ *   (MIUI, Samsung...) can kill the app in the background and prevent
+ *   triggering, despite the system alarm.
+ * - Automatic turning on may end up on the lock screen
+ *   if the device has a configured code/pattern — recommended not to
+ *   have one on a device dedicated to wall display.
+ * - Not tested on real device, like the rest of the platform
+ *   integrations of this project.
  */
 object ScreenPowerController {
 
@@ -70,9 +70,9 @@ object ScreenPowerController {
         runCatching {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent)
         }.onFailure {
-            // SecurityException possible si SCHEDULE_EXACT_ALARM est
-            // refusee : on retombe sur une alarme inexacte plutot que de
-            // ne rien planifier du tout.
+            // SecurityException possible if SCHEDULE_EXACT_ALARM is
+            // refused: we fall back to an inexact alarm rather than
+            // planning nothing at all.
             runCatching { alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAt, pendingIntent) }
         }
     }
@@ -101,7 +101,7 @@ object ScreenPowerController {
         )
     }
 
-    /** Tente d'eteindre reellement l'ecran. Ne fait rien (silencieusement) si les droits admin ne sont pas accordes. */
+    /** Attempts to actually turn off the screen. Does nothing (silently) if admin rights are not granted. */
     fun performScreenOff(context: Context) {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager ?: return
         if (!dpm.isAdminActive(deviceAdminComponent(context))) return
@@ -111,9 +111,9 @@ object ScreenPowerController {
     }
 
     /**
-     * Relance MainActivity avec les flags necessaires pour rallumer
-     * l'ecran et passer par-dessus l'ecran de verrouillage si possible
-     * (voir MainActivity.onCreate pour setShowWhenLocked/setTurnScreenOn).
+     * Relaunches MainActivity with the necessary flags to turn back on
+     * the screen and pass over the lock screen if possible
+     * (see MainActivity.onCreate for setShowWhenLocked/setTurnScreenOn).
      */
     fun performScreenOn(context: Context) {
         val intent = Intent(context, MainActivity::class.java).apply {

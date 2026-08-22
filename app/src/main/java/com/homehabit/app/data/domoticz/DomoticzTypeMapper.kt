@@ -3,11 +3,11 @@ package com.homehabit.app.data.domoticz
 import com.homehabit.app.model.WidgetType
 
 /**
- * Domoticz n'expose pas de "categorie widget" directement : il faut
- * deduire le type a partir de Type / SubType / SwitchType, qui varient
- * beaucoup selon le protocole (RFXCOM, Zwave, MQTT...) et le materiel.
- * Cette heuristique couvre les cas les plus courants ; a affiner au
- * contact de vrais appareils si des devices tombent en UNKNOWN.
+ * Domoticz does not expose a "widget category" directly: it is necessary to
+ * deduce the type from Type / SubType / SwitchType, which vary
+ * a lot depending on the protocol (RFXCOM, Zwave, MQTT...) and the hardware.
+ * This heuristic covers the most common cases; to be refined when
+ * in contact with real devices if some devices fall into UNKNOWN.
  */
 object DomoticzTypeMapper {
 
@@ -27,16 +27,16 @@ object DomoticzTypeMapper {
             type.contains("Thermostat", ignoreCase = true) ||
                 switchType.contains("Thermostat", ignoreCase = true) -> WidgetType.THERMOSTAT
 
-            // Domoticz expose les lumieres RGB/RGBW (Hue et similaires) sous
-            // Type = "Color Switch". On affine selon le SubType pour eviter
-            // de traiter les lampes "WW" (Warm White) ou "Switch" (White simple)
-            // comme du RGB.
+            // Domoticz exposes RGB/RGBW lights (Hue and similar) under
+            // Type = "Color Switch". We refine according to the SubType to avoid
+            // treating "WW" (Warm White) or "Switch" (simple White) lamps
+            // as RGB.
             type.contains("Color Switch", ignoreCase = true) -> {
                 val subType = device.SubType.orEmpty()
                 if (subType.contains("RGB", ignoreCase = true)) {
                     WidgetType.COLOR_LIGHT
                 } else {
-                    // Fallback sur DIMMER pour les lampes WW ou Switch simple
+                    // Fallback to DIMMER for WW or simple Switch lamps
                     WidgetType.DIMMER
                 }
             }
@@ -52,10 +52,10 @@ object DomoticzTypeMapper {
                 switchType.contains("Contact", ignoreCase = true) ||
                 type.contains("Sensor", ignoreCase = true) -> WidgetType.BINARY_SENSOR
 
-            // Capteurs génériques : couvre la plupart des types de capteurs
-            // Domoticz qui ne rentrent dans aucune autre catégorie
-            // (température seule, humidité, pluie, vent, UV, baromètre,
-            // pourcentage/batterie, compteurs d'énergie...).
+            // Generic sensors: covers most types of Domoticz sensors
+            // that do not fit into any other category
+            // (temperature alone, humidity, rain, wind, UV, barometer,
+            // percentage/battery, energy counters...).
             type.contains("Temp", ignoreCase = true) ||
                 type.contains("Humidity", ignoreCase = true) ||
                 type.contains("Rain", ignoreCase = true) ||
@@ -84,7 +84,7 @@ object DomoticzTypeMapper {
     }
 }
 
-/** Un device Domoticz decouvert, avec son type de widget deduit. */
+/** A discovered Domoticz device, with its deduced widget type. */
 data class DiscoveredDomoticzDevice(
     val idx: String,
     val name: String,
@@ -92,7 +92,7 @@ data class DiscoveredDomoticzDevice(
     val raw: DomoticzDeviceDto
 )
 
-/** Une scene/groupe Domoticz decouverte, ressource separee des devices. */
+/** A discovered Domoticz scene/group, separate resource from devices. */
 data class DiscoveredDomoticzScene(
     val idx: String,
     val name: String,

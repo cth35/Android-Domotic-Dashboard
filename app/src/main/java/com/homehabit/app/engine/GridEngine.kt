@@ -3,12 +3,12 @@ package com.homehabit.app.engine
 import com.homehabit.app.model.WidgetConfig
 
 /**
- * Moteur de placement pour la grille. Deux modes coexistent :
- * - Redimensionnement et ajout de widget : grille libre, trous autorisés,
- *   aucun réagencement automatique (isValidPlacement / findFirstFreeSlot).
- * - Déplacement au doigt (drag) : réagencement en cascade façon masonry
- *   (resolvePushLayout), qui pousse les widgets qui seraient chevauchés
- *   plus bas plutôt que de refuser le placement.
+ * Placement engine for the grid. Two modes coexist:
+ * - Resizing and adding widgets: free grid, holes allowed,
+ *   no automatic rearrangement (isValidPlacement / findFirstFreeSlot).
+ * - Finger movement (drag): cascade rearrangement like masonry
+ *   (resolvePushLayout), which pushes widgets that would be overlapped
+ *   lower rather than refusing placement.
  */
 object GridEngine {
 
@@ -18,8 +18,8 @@ object GridEngine {
     }
 
     /**
-     * Vérifie qu'un placement candidat ne sort pas de la grille et ne
-     * chevauche aucun widget existant (hors lui-même).
+     * Verifies that a candidate placement does not go out of the grid and does not
+     * overlap any existing widget (except itself).
      */
     fun isValidPlacement(
         candidateId: String,
@@ -37,8 +37,8 @@ object GridEngine {
     }
 
     /**
-     * Cherche la première position libre (scan haut -> bas, gauche -> droite)
-     * pour un widget de taille w x h. Utilisé à la création d'un nouveau widget.
+     * Searches for the first free position (scan top -> bottom, left -> right)
+     * for a widget of size w x h. Used when creating a new widget.
      */
     fun findFirstFreeSlot(
         w: Int,
@@ -57,20 +57,20 @@ object GridEngine {
             }
             y++
         }
-        // Garde-fou : place tout en bas si jamais rien n'est trouvé
+        // Safeguard: place at the very bottom if nothing is found
         return Rect(0, y, w, h)
     }
 
     /**
-     * Calcule la disposition complète si le widget `draggedId` était pose
-     * en `candidate` : les widgets qui se retrouveraient chevauches sont
-     * poussés vers le bas (y uniquement, x/w/h inchangés), en cascade si
-     * la poussée en entraine d'autres. Traitement dans l'ordre (y, x)
-     * d'origine pour un résultat stable et prévisible.
+     * Calculates the full layout if the `draggedId` widget was placed
+     * in `candidate`: widgets that would be overlapped are
+     * pushed down (y only, x/w/h unchanged), in cascade if
+     * the push triggers others. Processed in the original (y, x) order
+     * for a stable and predictable result.
      *
-     * Pure fonction : ne modifie rien, se contente de calculer le layout
-     * resultant. L'appelant décide de l'utiliser en aperçu pendant le
-     * drag, et/ou de le committer au drop.
+     * Pure function: modifies nothing, only calculates the resulting
+     * layout. The caller decides whether to use it as a preview during
+     * drag, and/or commit it at drop.
      */
     fun resolvePushLayout(
         draggedId: String,

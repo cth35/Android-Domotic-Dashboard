@@ -6,11 +6,11 @@ import android.content.Intent
 import com.homehabit.app.data.ConfigRepository
 
 /**
- * Recoit les alarmes planifiees par ScreenPowerController. Une seule
- * alarme AlarmManager ne se repete pas toute seule ici (on utilise
- * setExactAndAllowWhileIdle, pas setRepeating, plus fiable sur Android
- * recent) : chaque declenchement replanifie explicitement le lendemain,
- * que l'action ait reussi ou non.
+ * Receives alarms planned by ScreenPowerController. A single
+ * AlarmManager alarm does not repeat itself here (we use
+ * setExactAndAllowWhileIdle, not setRepeating, more reliable on recent
+ * Android): each trigger explicitly reschedules for the next day,
+ * whether the action succeeded or not.
  */
 class ScreenAlarmReceiver : BroadcastReceiver() {
 

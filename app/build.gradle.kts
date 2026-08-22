@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.homehabit.app"
-        // Version 24 requise pour rtsp-client-android (low-latency MediaCodec)
+        // Version 24 required for rtsp-client-android (low-latency MediaCodec)
         minSdk = 24
         targetSdk = 34
         versionCode = 1
@@ -50,34 +50,34 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.1")
 
-    // Config JSON du dashboard
+    // Dashboard JSON config
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // Client Domoticz (API /json.htm)
+    // Domoticz Client (API /json.htm)
     implementation("io.ktor:ktor-client-core:2.3.12")
     implementation("io.ktor:ktor-client-android:2.3.12")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
     implementation("io.ktor:ktor-client-auth:2.3.12")
 
-    // Canal websocket temps reel Domoticz (/json) : OkHttp direct plutot
-    // que le plugin websocket de Ktor, pour ne pas toucher au moteur
-    // Android existant de DomoticzClient (REST) qui fonctionne deja.
+    // Domoticz real-time websocket channel (/json): Direct OkHttp instead
+    // of Ktor websocket plugin, not to touch the existing Android
+    // engine of DomoticzClient (REST) which already works.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Serveur HTTP embarqué (edition de la config depuis un navigateur)
+    // Embedded HTTP server (config edition from a browser)
     implementation("io.ktor:ktor-server-core:2.3.12")
     implementation("io.ktor:ktor-server-cio:2.3.12")
     implementation("io.ktor:ktor-server-content-negotiation:2.3.12")
     implementation("io.ktor:ktor-server-cors:2.3.12")
 
-    // Camera : flux RTSP (libVLC) + chargement du snapshot poster (Coil)
+    // Camera: RTSP stream (libVLC) + snapshot poster loading (Coil)
     implementation("org.videolan.android:libvlc-all:3.7.0")
     implementation("com.github.alexeyvasilyev:rtsp-client-android:5.3.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // Icones Font Awesome (a activer a l'etape suivante)
+    // Font Awesome icons (to activate in the next step)
     // implementation("com.mikepenz:iconics-core:5.4.0")
     // implementation("com.mikepenz:iconics-compose:5.4.0")
     // implementation("com.mikepenz:google-font-awesome-typeface:6.5.1.0-kotlin@aar")

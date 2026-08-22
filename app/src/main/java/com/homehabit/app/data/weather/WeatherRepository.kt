@@ -15,13 +15,13 @@ import kotlin.math.roundToInt
 class WeatherRepository(private val client: OpenMeteoClient) {
 
     /**
-     * La meteo change lentement : pas besoin de poller aussi souvent que
-     * Domoticz. 15 minutes par defaut, largement suffisant et evite de
-     * solliciter l'API pour rien.
+     * Weather changes slowly: no need to poll as often as
+     * Domoticz. 15 minutes by default, largely sufficient and avoids
+     * soliciting the API for nothing.
      *
-     * Un seul appel Open-Meteo par widget suffit pour les deux types
-     * (WEATHER et FORECAST) — seul le nombre de jours demande differe,
-     * l'API renvoie de toute facon current + daily dans la meme reponse.
+     * A single Open-Meteo call per widget is enough for both types
+     * (WEATHER and FORECAST) — only the number of days requested differs,
+     * the API returns current + daily anyway in the same response.
      */
     fun observeStates(
         widgets: List<WidgetConfig>,
@@ -74,7 +74,7 @@ class WeatherRepository(private val client: OpenMeteoClient) {
                     emit(lastStates.toMap())
                 }
             } catch (e: Exception) {
-                // Ignore et continue
+                // Ignore and continue
             }
             delay(pollIntervalMs)
         }
@@ -102,7 +102,7 @@ class WeatherRepository(private val client: OpenMeteoClient) {
         }
     }
 
-    /** "yyyy-MM-dd" -> "Lun"/"Mar"/... en francais. Retombe sur "--" si le format est inattendu. */
+    /** "yyyy-MM-dd" -> "Mon"/"Tue"/... in French. Falls back to "--" if the format is unexpected. */
     private fun formatDayLabel(isoDate: String): String = runCatching {
         val parsed = SimpleDateFormat("yyyy-MM-dd", Locale.FRANCE).parse(isoDate) ?: return "--"
         SimpleDateFormat("EEE", Locale.FRANCE).format(parsed).replaceFirstChar { it.uppercase() }

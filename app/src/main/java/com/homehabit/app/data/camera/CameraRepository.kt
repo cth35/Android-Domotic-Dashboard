@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.flow
 class CameraRepository {
 
     /**
-     * Pour les caméras, on ne fait pas de vrai poll réseau ici (Coil s'en
-     * charge dans l'UI pour le snapshot), mais on émet un état régulier
-     * pour forcer le rafraîchissement du badge "Last Update" et synchroniser
-     * le cache-busting des images si nécessaire.
+     * For cameras, we don't do a real network poll here (Coil handles it
+     * in the UI for the snapshot), but we emit a regular state
+     * to force the refresh of the "Last Update" badge and synchronize
+     * image cache-busting if necessary.
      */
     fun observeStates(
         widgets: List<WidgetConfig>
@@ -37,9 +37,9 @@ class CameraRepository {
             }
             emit(states)
             
-            // Rafraîchissement global du badge "Last Update" (par défaut 30s).
-            // Les réglages spécifiques par widget pour l'image elle-même sont 
-            // gérés directement dans le composant CameraContent.
+            // Global refresh of the "Last Update" badge (default 30s).
+            // Specific settings per widget for the image itself are
+            // managed directly in the CameraContent component.
             delay(30_000L)
         }
     }

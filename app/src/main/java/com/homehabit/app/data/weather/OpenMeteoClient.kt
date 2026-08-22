@@ -10,9 +10,9 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 /**
- * Client pour l'API Open-Meteo (https://open-meteo.com), gratuite et sans
- * cle API. Un seul appel suffit : temperature courante + code meteo +
- * min/max/code par jour (jusqu'a 7 jours pour le widget prevision).
+ * Client for the Open-Meteo API (https://open-meteo.com), free and without
+ * API key. One call is enough: current temperature + weather code +
+ * min/max/code per day (up to 7 days for the forecast widget).
  */
 class OpenMeteoClient {
 

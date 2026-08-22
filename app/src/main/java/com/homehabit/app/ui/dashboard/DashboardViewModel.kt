@@ -41,12 +41,12 @@ class DashboardViewModel(
     private val repository: ConfigRepository
 ) : ViewModel() {
 
-    // Remplacables a chaud : quand les reglages Domoticz changent
-    // (updateDomoticzSettings), les anciens clients sont fermes et de
-    // nouveaux sont crees avec la nouvelle config, sans redemarrer toute
-    // l'app. domoticzWsClient est le canal websocket temps reel,
-    // complementaire du polling REST (domoticzClient) garde comme filet
-    // de securite — voir startDomoticzLiveUpdates().
+    // Hot-swappable: when Domoticz settings change
+    // (updateDomoticzSettings), old clients are closed and new ones
+    // are created with the new config, without restarting the entire
+    // app. domoticzWsClient is the real-time websocket channel,
+    // complementary to REST polling (domoticzClient) kept as a safety
+    // net — see startDomoticzLiveUpdates().
     private var domoticzClient = DomoticzClient(repository.current().settings.toDomoticzConfig())
     private var domoticzWsClient = DomoticzWebSocketClient(repository.current().settings.toDomoticzConfig())
     private var domoticzRepository = DomoticzRepository(domoticzClient, domoticzWsClient)
@@ -55,14 +55,14 @@ class DashboardViewModel(
     private val weatherRepository = WeatherRepository(weatherClient)
     private val cameraRepository = CameraRepository()
 
-    // Source unique de la config : vient directement du repository, partagee
-    // avec le serveur HTTP. Toute modification (drag/resize, ajout, ou
-    // edition via navigateur) transite par repository.updateConfig() et
-    // se reflete automatiquement ici.
+    // Unique source of the config: comes directly from the repository, shared
+    // with the HTTP server. Any modification (drag/resize, addition, or
+    // edition via browser) passes through repository.updateConfig() and
+    // is automatically reflected here.
     val config: StateFlow<DashboardConfig> = repository.configFlow
 
-    // Page actuellement affichee dans le pager. Necessaire pour savoir ou
-    // ajouter un nouveau widget (toujours sur la page visible).
+    // Page currently displayed in the pager. Necessary to know where
+    // to add a new widget (always on the visible page).
     private val _currentPageIndex = MutableStateFlow(0)
     val currentPageIndex: StateFlow<Int> = _currentPageIndex.asStateFlow()
 
@@ -70,10 +70,10 @@ class DashboardViewModel(
         _currentPageIndex.value = index
     }
 
-    // Etats reels Domoticz, meteo et camera fusionnes. Les etats live
-    // sont globaux (pas rattaches a une page) : peu importe la page ou
-    // vit un widget, son etat continue d'etre rafraichi meme si on ne le
-    // regarde pas.
+    // Actual Domoticz, weather and camera states merged. Live states
+    // are global (not attached to a page): no matter which page
+    // a widget lives on, its state continues to be refreshed even if we are not
+    // looking at it.
     private var domoticzStates: Map<String, WidgetStateEntry> = emptyMap()
     private var weatherStates: Map<String, WidgetStateEntry> = emptyMap()
     private var cameraStates: Map<String, WidgetStateEntry> = emptyMap()
@@ -89,14 +89,14 @@ class DashboardViewModel(
     private val _availableDevices = MutableStateFlow<List<DiscoveredDomoticzDevice>>(emptyList())
     val availableDevices: StateFlow<List<DiscoveredDomoticzDevice>> = _availableDevices.asStateFlow()
 
-    // Ressource Domoticz distincte des devices (getscenes vs getdevices),
-    // donc decouverte separee plutot que fusionnee dans availableDevices.
+    // Domoticz resource distinct from devices (getscenes vs getdevices),
+    // so separate discovery rather than merged in availableDevices.
     private val _availableScenes = MutableStateFlow<List<DiscoveredDomoticzScene>>(emptyList())
     val availableScenes: StateFlow<List<DiscoveredDomoticzScene>> = _availableScenes.asStateFlow()
 
-    // Sparkline 24h pour les widgets temperature (sensor kind=TEMPERATURE
-    // ou thermostat). Poll separe et peu frequent (10min) car couteux
-    // (recupere ~288 points par appel cote Domoticz) et purement decoratif.
+    // 24h sparkline for temperature widgets (sensor kind=TEMPERATURE
+    // or thermostat). Separate and infrequent poll (10min) because costly
+    // (retrieves ~288 points per call on the Domoticz side) and purely decorative.
     private val _sparklines = MutableStateFlow<Map<String, List<Float>>>(emptyMap())
     val sparklines: StateFlow<Map<String, List<Float>>> = _sparklines.asStateFlow()
 
@@ -104,10 +104,10 @@ class DashboardViewModel(
     private var domoticzInitialFetchJob: Job? = null
     private var domoticzLiveJob: Job? = null
 
-    // Etat du canal websocket, expose pour un futur indicateur visuel
-    // (ex. petit point dans SettingsDialog) et pour le debug sur device
-    // reel. N'affecte pas le polling REST, qui continue de tourner en
-    // parallele quoi qu'il arrive (voir startDomoticzLiveUpdates).
+    // Websocket channel state, exposed for a future visual indicator
+    // (e.g., small dot in SettingsDialog) and for debug on real
+    // device. Does not affect REST polling, which continues to run in
+    // parallel no matter what (see startDomoticzLiveUpdates).
     private val _isDomoticzLiveConnected = MutableStateFlow(false)
     val isDomoticzLiveConnected: StateFlow<Boolean> = _isDomoticzLiveConnected.asStateFlow()
 
@@ -135,9 +135,9 @@ class DashboardViewModel(
     }
 
     /**
-     * Independant des reglages Domoticz (chaque widget meteo porte ses
-     * propres lat/lon) : jamais besoin d'etre redemarre manuellement,
-     * flatMapLatest suffit a reagir aux changements de widgets.
+     * Independent of Domoticz settings (each weather widget carries its
+     * own lat/lon): never needs to be manually restarted,
+     * flatMapLatest is enough to react to widget changes.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun startWeatherPolling() {
@@ -154,18 +154,18 @@ class DashboardViewModel(
     }
 
     /**
-     * Fusionne un lot d'etats Domoticz fraichement recus (poll scenes,
-     * fetch initial, resync de reconnexion, ou delta websocket) dans
-     * domoticzStates, publie le resultat, et retourne. Regle unique
-     * partagee par les quatre call sites ci-dessous : on ne remplace un
-     * etat local que si l'etat entrant est plus recent, avec une marge de
-     * 2 secondes pour absorber un eventuel decalage d'horloge entre la
-     * tablette et le serveur Domoticz.
+     * Merges a batch of freshly received Domoticz states (scene poll,
+     * initial fetch, reconnection resync, or websocket delta) into
+     * domoticzStates, publishes the result, and returns. Unique rule
+     * shared by the four call sites below: we only replace a
+     * local state if the incoming state is more recent, with a margin of
+     * 2 seconds to absorb a possible clock shift between the
+     * tablet and the Domoticz server.
      *
-     * Important : meme le resync de reconnexion passe par cette regle
-     * desormais (pas d'ecrasement brut) — un resync REST qui termine
-     * juste apres une mise a jour optimiste locale (ex. toggleLight) ne
-     * doit pas ecraser une action plus recente que l'etat qu'il rapporte.
+     * Important: even the reconnection resync goes through this rule
+     * now (no brute overwrite) — a REST resync that ends
+     * just after a local optimistic update (e.g., toggleLight) must
+     * not overwrite an action more recent than the state it reports.
      */
     private fun mergeDomoticzStates(incoming: Map<String, WidgetStateEntry>) {
         if (incoming.isEmpty()) return
@@ -181,13 +181,13 @@ class DashboardViewModel(
     }
 
     /**
-     * Poll continu des widgets SCENE uniquement (getscenes) — les devices
-     * ne sont plus polles ici, voir startDomoticzInitialFetch() (etat de
-     * depart) et startDomoticzLiveUpdates() (websocket, seule source de
-     * mise a jour ensuite). Redemarrable : updateDomoticzSettings()
-     * annule ce job et en relance un nouveau avec le domoticzRepository
-     * fraichement recree, pour que le changement de serveur prenne effet
-     * immediatement sans redemarrer toute l'app.
+     * Continuous poll of SCENE widgets only (getscenes) — devices
+     * are no longer polled here, see startDomoticzInitialFetch() (start
+     * state) and startDomoticzLiveUpdates() (websocket, only source of
+     * subsequent update). Restartable: updateDomoticzSettings()
+     * cancels this job and launches a new one with the freshly recreated
+     * domoticzRepository, so that the server change takes effect
+     * immediately without restarting the entire app.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun startDomoticzPolling() {
@@ -202,21 +202,21 @@ class DashboardViewModel(
     }
 
     /**
-     * Etat de depart des widgets devices (hors scenes) : un seul appel
-     * bulk a chaque fois que la liste de widgets Domoticz change (ajout,
-     * suppression, ou premier chargement). Ensuite, plus aucun appel
-     * REST periodique sur les devices — le websocket (voir
-     * startDomoticzLiveUpdates) est la SEULE source de mise a jour.
+     * Starting state of device widgets (excluding scenes): a single
+     * bulk call each time the Domoticz widget list changes (addition,
+     * deletion, or first loading). Thereafter, no more periodic REST
+     * calls on devices — the websocket (see
+     * startDomoticzLiveUpdates) is the ONLY source of update.
      *
-     * Compromis assume ("full websocket") : si le canal websocket perd
-     * silencieusement un evenement sans que la connexion se coupe
-     * franchement (cas rare mais possible), le widget concerne reste
-     * affiche avec sa derniere valeur connue jusqu'au prochain changement
-     * de widgets ou redemarrage de l'app — il n'y a plus de resynchro
-     * REST periodique pour rattraper ce genre de decalage. A surveiller
-     * en usage reel ; si ca s'avere genant, la parade la plus simple est
-     * un appel periodique tres espace (ex. toutes les 5-10min) plutot que
-     * de revenir a un polling 5s.
+     * Assumed compromise ("full websocket"): if the websocket channel silently
+     * loses an event without the connection clearly cutting
+     * (rare but possible case), the concerned widget remains
+     * displayed with its last known value until the next change of
+     * widgets or app restart — there is no more periodic REST
+     * resync to catch up with this kind of offset. To be monitored
+     * in real use; if it proves annoying, the simplest workaround is
+     * a very spaced periodic call (e.g., every 5-10min) rather than
+     * returning to 5s polling.
      */
     private fun startDomoticzInitialFetch() {
         domoticzInitialFetchJob?.cancel()
@@ -230,35 +230,35 @@ class DashboardViewModel(
         }
     }
 
-    // Derniere liste de widgets Domoticz connue, mise a jour par
-    // startDomoticzLiveUpdates() a chaque changement de config. Sert au
-    // resync declenche sur reconnexion (voir plus bas) : le websocket ne
-    // fournit pas la liste de widgets, seulement l'idx qui vient de
-    // changer, donc il faut la garder sous la main pour pouvoir relancer
-    // un fetchInitialDeviceStates() cible.
+    // Last known Domoticz widget list, updated by
+    // startDomoticzLiveUpdates() at each config change. Used for the
+    // resync triggered on reconnection (see below): the websocket does not
+    // provide the widget list, only the idx that just
+    // changed, so it must be kept on hand to be able to relaunch
+    // a targeted fetchInitialDeviceStates().
     private var currentDomoticzWidgets: List<WidgetConfig> = emptyList()
 
     /**
-     * Canal websocket temps reel (/json) : SEULE source de mise a jour
-     * pour les devices Domoticz (voir startDomoticzInitialFetch pour
-     * l'etat de depart). Reconnexion/backoff geres dans
+     * Real-time websocket channel (/json): ONLY update source
+     * for Domoticz devices (see startDomoticzInitialFetch for
+     * the starting state). Reconnection/backoff managed in
      * DomoticzWebSocketClient.
      *
-     * A la RECONNEXION (pas la toute premiere connexion, deja couverte
-     * par startDomoticzInitialFetch), on relance un fetch complet des
-     * devices pour rattraper tout ce qui a pu changer physiquement
-     * pendant la coupure (ex. Domoticz redemarre pour maintenance,
-     * quelqu'un actionne un interrupteur pendant ce temps) — sans ca,
-     * ces widgets resteraient figes sur leur derniere valeur connue
-     * jusqu'a leur prochain changement, potentiellement jamais.
+     * On RECONNECTION (not the very first connection, already covered
+     * by startDomoticzInitialFetch), we relaunch a full fetch of
+     * devices to catch everything that may have changed physically
+     * during the cut (e.g., Domoticz restarts for maintenance,
+     * someone operates a switch during this time) — without this,
+     * these widgets would remain frozen on their last known value
+     * until their next change, potentially never.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun startDomoticzLiveUpdates() {
         domoticzLiveJob?.cancel()
-        // Suppose "deja connecte" au demarrage pour ne pas declencher un
-        // resync redondant sur la toute premiere connexion (deja geree
-        // par startDomoticzInitialFetch). Ne redevient pertinent qu'apres
-        // une vraie coupure suivie d'une reconnexion.
+        // Assumes "already connected" at startup so as not to trigger a
+        // redundant resync on the very first connection (already managed
+        // by startDomoticzInitialFetch). Only becomes relevant after
+        // a real cut followed by a reconnection.
         var wasConnected = true
 
         domoticzLiveJob = viewModelScope.launch {
@@ -291,10 +291,10 @@ class DashboardViewModel(
     }
 
     /**
-     * Persiste les nouveaux reglages Domoticz, recree les clients HTTP et
-     * websocket (les anciens sont explicitement fermes pour ne pas fuiter
-     * de connexion) et relance polling + canal temps reel avec la
-     * nouvelle configuration.
+     * Persists new Domoticz settings, recreates HTTP and
+     * websocket clients (old ones are explicitly closed so as not to leak
+     * connections) and relaunches polling + real-time channel with the
+     * new configuration.
      */
     fun updateDomoticzSettings(settings: AppSettings) {
         val current = repository.current()
@@ -313,15 +313,15 @@ class DashboardViewModel(
     }
 
     /**
-     * Determine apres coup (une fois les etats connus) quels widgets sont
-     * de vrais capteurs/thermostats de temperature, et va chercher leur
-     * historique 24h pour la sparkline. Volontairement separe du poll
-     * principal : pas besoin de rafraichir un mini-graphe toutes les 5s.
+     * Determines after the fact (once the states are known) which widgets are
+     * true temperature sensors/thermostats, and fetches their
+     * 24h history for the sparkline. Voluntarily separate from the main
+     * poll: no need to refresh a mini-graph every 5s.
      */
     private fun startSparklinePolling() {
         viewModelScope.launch {
-            // Laisse le temps au premier cycle de poll Domoticz (etats
-            // sensor/thermostat) de repondre avant la premiere verification.
+            // Gives time for the first Domoticz poll cycle (sensor/thermostat
+            // states) to respond before the first verification.
             delay(8_000L)
 
             while (true) {
@@ -394,7 +394,7 @@ class DashboardViewModel(
         }
     }
 
-    /** Widgets DIMMER/COLOR_LIGHT : ajuste la luminosite (0-100). */
+    /** DIMMER/COLOR_LIGHT widgets: adjusts brightness (0-100). */
     fun setBrightness(widgetId: String, percent: Int) {
         val widget = repository.current().findWidget(widgetId) ?: return
         val entry = _widgetStates.value[widgetId]
@@ -417,7 +417,7 @@ class DashboardViewModel(
         }
     }
 
-    /** Widgets COLOR_LIGHT uniquement : change la couleur (palette de presets). */
+    /** COLOR_LIGHT widgets only: changes color (preset palette). */
     fun setLightColor(widgetId: String, hex: String) {
         val widget = repository.current().findWidget(widgetId) ?: return
         val entry = _widgetStates.value[widgetId]
@@ -456,12 +456,12 @@ class DashboardViewModel(
         }
     }
 
-    /** Tap sur le widget volet : bascule ouvert/ferme selon la position actuelle. */
+    /** Tap on the shutter widget: toggles open/closed depending on current position. */
     /**
-     * Pas de mise a jour optimiste : contrairement a open/close, on ne
-     * connait pas la position exacte apres un stop (le volet peut
-     * s'arreter n'importe ou entre 0 et 100%) — le prochain poll (5s)
-     * ramenera la vraie valeur cote Domoticz.
+     * No optimistic update: unlike open/close, we do not
+     * know the exact position after a stop (the shutter can
+     * stop anywhere between 0 and 100%) — the next poll (5s)
+     * will bring the true value on the Domoticz side.
      */
     fun stopShutter(widgetId: String) {
         val widget = repository.current().findWidget(widgetId) ?: return
@@ -470,7 +470,7 @@ class DashboardViewModel(
         }
     }
 
-    /** Style "toggle" (source.shutterStyle == "toggle") : bascule ouvert/ferme selon la position actuelle. */
+    /** "toggle" style (source.shutterStyle == "toggle"): toggles open/closed depending on current position. */
     fun toggleShutter(widgetId: String) {
         val current = _widgetStates.value[widgetId]?.state as? WidgetLiveState.Shutter
         val shouldOpen = (current?.percentOpen ?: 0) < 50
@@ -513,12 +513,12 @@ class DashboardViewModel(
     }
 
     /**
-     * Deplace/redimensionne un widget si et seulement si le nouveau
-     * placement est valide (grille libre, trous autorises, aucun
-     * chevauchement) sur SA page. Persiste immediatement via le
-     * repository, donc visible aussi cote navigateur au prochain
-     * GET /config. Utilise pour le redimensionnement (poignee), pas pour
-     * le deplacement (voir applyLayout).
+     * Moves/resizes a widget if and only if the new
+     * placement is valid (free grid, holes allowed, no
+     * overlap) on ITS page. Persists immediately via the
+     * repository, so also visible on the browser side at the next
+     * GET /config. Used for resizing (handle), not for
+     * moving (see applyLayout).
      */
     fun updateWidgetRect(widgetId: String, newRect: GridEngine.Rect) {
         val current = repository.current()
@@ -544,12 +544,12 @@ class DashboardViewModel(
     }
 
     /**
-     * Committe d'un coup la disposition resultant d'un drag de
-     * repositionnement (GridEngine.resolvePushLayout) : le widget
-     * deplace prend sa nouvelle position, et les widgets pousses pour
-     * lui faire de la place gardent leur nouvelle position (reagencement
-     * reel, pas juste un apercu). Tous les widgets concernes sont
-     * forcement sur la meme page (celle visible pendant le drag).
+     * Commits the layout resulting from a positioning drag
+     * (GridEngine.resolvePushLayout) all at once: the moved widget
+     * takes its new position, and the pushed widgets to make
+     * room for it keep their new position (actual rearrangement,
+     * not just a preview). All concerned widgets are
+     * necessarily on the same page (the one visible during the drag).
      */
     fun applyLayout(newRects: Map<String, GridEngine.Rect>) {
         val anyId = newRects.keys.firstOrNull() ?: return
@@ -564,7 +564,7 @@ class DashboardViewModel(
         repository.updateConfig(current.replacingPage(pageIndex, page.copy(widgets = updatedWidgets)))
     }
 
-    /** Ajoute toujours sur la page actuellement affichee. */
+    /** Always adds to the currently displayed page. */
     fun addWidget(newWidget: WidgetConfig) {
         val current = repository.current()
         val pageIndex = _currentPageIndex.value.coerceIn(0, current.pages.lastIndex.coerceAtLeast(0))
@@ -590,11 +590,11 @@ class DashboardViewModel(
     }
 
     /**
-     * "Deja utilise" verifie sur TOUTES les pages, mais uniquement parmi
-     * les widgets non-scene : devices et scenes/groupes sont deux tables
-     * Domoticz distinctes qui peuvent en theorie partager un meme numero
-     * idx, melanger les deux filtres aurait pu masquer a tort un device
-     * ou une scene legitimes.
+     * "Already used" checked on ALL pages, but only among
+     * non-scene widgets: devices and scenes/groups are two distinct Domoticz
+     * tables that can in theory share the same idx number; mixing
+     * the two filters could have wrongly hidden a legitimate device
+     * or scene.
      */
     fun discoverDomoticzDevices() {
         viewModelScope.launch {
@@ -646,14 +646,14 @@ class DashboardViewModel(
             y = 0,
             w = w,
             h = h,
-            label = scene.name, // Nom Domoticz ecrit en dur dans le JSON
+            label = scene.name, // Domoticz name hardcoded in the JSON
             source = WidgetSource(provider = "domoticz", deviceId = "idx:${scene.idx}")
         )
         addWidget(newWidget)
         _availableScenes.value = _availableScenes.value.filterNot { it.idx == scene.idx }
     }
 
-    /** Tap sur un widget scene/groupe : declenche la scene (toujours "On"), ou bascule le groupe on/off. */
+    /** Tap on a scene/group widget: triggers the scene (always "On"), or toggles the group on/off. */
     fun triggerScene(widgetId: String) {
         val widget = repository.current().findWidget(widgetId) ?: return
         val entry = _widgetStates.value[widgetId]
@@ -674,7 +674,7 @@ class DashboardViewModel(
         }
     }
 
-    // --- Gestion des pages ---
+    // --- Page management ---
 
     fun addPage(name: String? = null): Int {
         val current = repository.current()
@@ -684,7 +684,7 @@ class DashboardViewModel(
             name = name ?: "Page $pageNumber"
         )
         repository.updateConfig(current.copy(pages = current.pages + newPage))
-        val newIndex = current.pages.size // index de la nouvelle page dans la liste mise a jour
+        val newIndex = current.pages.size // index of the new page in the updated list
         _currentPageIndex.value = newIndex
         return newIndex
     }
@@ -703,7 +703,7 @@ class DashboardViewModel(
         repository.updateConfig(current.replacingPage(pageIndex, page.copy(name = name.trim(), grid = grid)))
     }
 
-    /** Refuse de supprimer la derniere page restante : toujours au moins une. */
+    /** Refuses to delete the last remaining page: always at least one. */
     fun removePage(pageIndex: Int) {
         val current = repository.current()
         if (current.pages.size <= 1) return
@@ -725,7 +725,7 @@ class DashboardViewModel(
     }
 }
 
-// --- Helpers page-aware, prives a ce fichier ---
+// --- Page-aware helpers, private to this file ---
 
 private fun DashboardConfig.allWidgets(): List<WidgetConfig> = pages.flatMap { it.widgets }
 

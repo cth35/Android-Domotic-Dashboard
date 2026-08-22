@@ -1,17 +1,17 @@
 package com.homehabit.app.server
 
 /**
- * Page d'édition minimale servie sur / : un simple éditeur JSON texte.
- * Suffisant pour valider le principe (lecture, édition, sauvegarde) ;
- * un éditeur visuel drag & drop côté navigateur est envisageable plus
- * tard mais pas nécessaire pour l'instant vu que l'édition tactile
- * existe déjà directement dans l'app.
+ * Minimal editing page served on /: a simple JSON text editor.
+ * Sufficient to validate the principle (reading, editing, saving);
+ * a visual drag & drop editor on the browser side is conceivable later
+ * but not necessary for now since tactile editing already
+ * exists directly in the app.
  *
- * Le token est injecté directement dans le JS (variable TOKEN) pour que
- * les appels fetch() vers /config portent l'entete Authorization sans
- * que l'utilisateur ait a le ressaisir a chaque action. Alphabet du
- * token restreint (voir ConfigRepository.ensureHttpAuthToken) donc pas
- * de risque d'injection en l'interpolant tel quel ici.
+ * The token is injected directly into the JS (TOKEN variable) so that
+ * fetch() calls to /config carry the Authorization header without
+ * the user having to re-enter it at each action. Restricted token
+ * alphabet (see ConfigRepository.ensureHttpAuthToken) so no
+ * risk of injection by interpolating it as is here.
  */
 fun configEditorHtml(token: String): String = """
 <!DOCTYPE html>

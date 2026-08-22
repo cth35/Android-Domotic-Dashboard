@@ -7,9 +7,9 @@ import com.homehabit.app.server.ConfigHttpServer
 
 class HomeHabitApp : Application() {
 
-    // Instance unique partagée entre l'UI (DashboardViewModel) et le
-    // serveur HTTP embarqué : toute modification via l'un est visible
-    // par l'autre via configFlow.
+    // Unique instance shared between the UI (DashboardViewModel) and the
+    // embedded HTTP server: any modification via one is visible
+    // by the other via configFlow.
     val configRepository by lazy { ConfigRepository(this) }
 
     private val configServer by lazy { ConfigHttpServer(configRepository) }
@@ -17,9 +17,9 @@ class HomeHabitApp : Application() {
     override fun onCreate() {
         super.onCreate()
         configServer.start()
-        // Couvre le tout premier lancement et le cas ou l'app est
-        // relancee sans redemarrage complet de l'appareil (BootReceiver
-        // ne se declenche que sur un vrai reboot).
+        // Covers the very first launch and the case where the app is
+        // relaunched without a full restart of the device (BootReceiver
+        // only triggers on a real reboot).
         ScreenPowerController.scheduleAlarms(this, configRepository.current().settings)
     }
 }

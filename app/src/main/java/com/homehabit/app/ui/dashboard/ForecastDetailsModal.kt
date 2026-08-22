@@ -114,7 +114,7 @@ private fun ForecastDayRow(day: ForecastDay) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = day.condition,
-                color = TextPrimary, // Plus clair
+                color = TextPrimary, // Brighter
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1

@@ -58,13 +58,13 @@ fun CameraStreamModal(
     
     val playbackState by (playerNative?.state ?: playerVlc?.state!!).collectAsState()
 
-    // MediaPlayer.Event.Playing signale un changement d'etat interne chez
-    // libVLC, mais ne garantit pas qu'une frame ait deja ete rendue a
-    // l'ecran (negociation RTSP, attente de keyframe, demarrage du
-    // decodage materiel). Sans ce delai, le fondu peut demarrer avant
-    // qu'il y ait vraiment une image, provoquant un flash noir entre le
-    // poster et le flux. Reinitialise immediatement si l'etat quitte
-    // PLAYING (ex: coupure puis reconnexion).
+    // MediaPlayer.Event.Playing signals an internal state change at
+    // libVLC, but does not guarantee that a frame has already been rendered on
+    // the screen (RTSP negotiation, waiting for keyframe, starting
+    // hardware decoding). Without this delay, the fade can start before
+    // there is really an image, causing a black flash between the
+    // poster and the stream. Reset immediately if the state leaves
+    // PLAYING (e.g., disconnection then reconnection).
     var visuallyReady by remember { mutableStateOf(false) }
     LaunchedEffect(playbackState) {
         if (playbackState == RtspPlaybackState.PLAYING) {
@@ -77,8 +77,8 @@ fun CameraStreamModal(
         }
     }
 
-    // Liberation systematique du player a la fermeture de la modale
-    // (pas de lecture RTSP en arriere-plan).
+    // Systematic release of the player when the modal is closed
+    // (no RTSP playback in the background).
     DisposableEffect(Unit) {
         onDispose { 
             playerVlc?.stopAndRelease()

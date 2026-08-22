@@ -3,9 +3,9 @@ package com.homehabit.app.data.domoticz
 import com.homehabit.app.model.AppSettings
 
 /**
- * Config runtime du client HTTP Domoticz. Desormais derivee de
- * AppSettings (persistee, editable via l'ecran de reglages ou le
- * navigateur) plutot que d'etre en dur.
+ * Runtime config of the Domoticz HTTP client. Now derived from
+ * AppSettings (persisted, editable via the settings screen or the
+ * browser) instead of being hardcoded.
  */
 data class DomoticzConfig(
     val host: String = "192.168.1.10",

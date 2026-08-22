@@ -3,9 +3,9 @@ package com.homehabit.app.data.domoticz
 import kotlinx.serialization.Serializable
 
 /**
- * Reponse de /json.htm?type=devices&rid=... ou type=devices&used=true
- * L'API Domoticz renvoie beaucoup de champs optionnels selon le type
- * d'appareil ; on ne modelise que ceux utiles au dashboard.
+ * Response from /json.htm?type=devices&rid=... or type=devices&used=true
+ * The Domoticz API returns many optional fields depending on the type
+ * of device; we only model those useful for the dashboard.
  */
 @Serializable
 data class DomoticzDevicesResponse(
@@ -20,26 +20,26 @@ data class DomoticzDeviceDto(
     val Type: String? = null,
     val SubType: String? = null,
     val SwitchType: String? = null,
-    // "On" / "Off" / "Open" / "Closed" / "Stopped" selon le type d'appareil
+    // "On" / "Off" / "Open" / "Closed" / "Stopped" depending on device type
     val Status: String? = null,
-    // Valeur brute affichee par Domoticz (ex "21.5 C", "60 %")
+    // Raw value displayed by Domoticz (e.g., "21.5 C", "60 %")
     val Data: String? = null,
-    // Position pour volets/dimmers (0-100)
+    // Position for shutters/dimmers (0-100)
     val Level: Int? = null,
-    // Temperature mesuree (capteurs, thermostats)
+    // Measured temperature (sensors, thermostats)
     val Temp: Double? = null,
-    // Consigne configuree (thermostats)
+    // Configured setpoint (thermostats)
     val SetPoint: Double? = null,
     val Humidity: Double? = null,
-    // Format Domoticz : "yyyy-MM-dd HH:mm:ss", heure locale du serveur Domoticz
+    // Domoticz format: "yyyy-MM-dd HH:mm:ss", local time of the Domoticz server
     val LastUpdate: String? = null,
-    // JSON brut renvoye par Domoticz pour les lumieres couleur, ex:
+    // Raw JSON returned by Domoticz for color lights, e.g.:
     // {"m":3,"t":0,"r":255,"g":100,"b":50,"cw":0,"ww":0}
     val Color: String? = null
 )
 
 /**
- * Reponse generique des endpoints de commande
+ * Generic response from command endpoints
  * (/json.htm?type=command&param=...).
  */
 @Serializable
@@ -51,10 +51,10 @@ data class DomoticzCommandResponse(
 }
 
 /**
- * Reponse de /json.htm?type=command&param=graph&sensor=temp&idx=IDX&range=day
- * Utilisee pour la sparkline des widgets temperature. Le champ "te"
- * (temperature actuelle du point) est celui qui nous interesse ; les
- * autres champs varient selon le type de capteur et ne sont pas modelises.
+ * Response from /json.htm?type=command&param=graph&sensor=temp&idx=IDX&range=day
+ * Used for the sparkline of temperature widgets. The "te" field
+ * (current temperature of the point) is the one that interests us; the
+ * other fields vary according to the type of sensor and are not modeled.
  */
 @Serializable
 data class DomoticzGraphResponse(
@@ -68,9 +68,9 @@ data class DomoticzGraphPointDto(
 )
 
 /**
- * Reponse de /json.htm?type=command&param=getscenes (depuis stable
- * 2023.2). Distinct de getdevices : les scenes/groupes sont une
- * ressource Domoticz a part entiere.
+ * Response from /json.htm?type=command&param=getscenes (since stable
+ * 2023.2). Distinct from getdevices: scenes/groups are a
+ * Domoticz resource in their own right.
  */
 @Serializable
 data class DomoticzScenesResponse(
@@ -81,10 +81,10 @@ data class DomoticzScenesResponse(
 data class DomoticzSceneDto(
     val idx: String,
     val Name: String? = null,
-    // "On" / "Off" — n'a de sens reel que pour un Group (les Scenes sont
-    // des declencheurs sans etat persistant, toujours "Off" au repos)
+    // "On" / "Off" — only has real meaning for a Group (Scenes are
+    // triggers without persistent state, always "Off" at rest)
     val Status: String? = null,
-    // "Scene" (declencheur, On uniquement) ou "Group" (togglable On/Off)
+    // "Scene" (trigger, On only) or "Group" (togglable On/Off)
     val Type: String? = null,
     val LastUpdate: String? = null
 )

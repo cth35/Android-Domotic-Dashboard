@@ -14,10 +14,10 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 /**
- * Evenements consommes par le ViewModel depuis le canal websocket, deja
- * traduits dans le vocabulaire du dashboard (WidgetStateEntry) plutot
- * que le DTO Domoticz brut — pour que updateDomoticzSettings() et load()
- * n'aient qu'un seul type d'evenement a gerer, comme pour le polling.
+ * Events consumed by the ViewModel from the websocket channel, already
+ * translated into the dashboard vocabulary (WidgetStateEntry) rather
+ * than the raw Domoticz DTO — so that updateDomoticzSettings() and load()
+ * have only one type of event to handle, as with polling.
  */
 sealed class DomoticzLiveEvent {
     data class ConnectionChanged(val connected: Boolean) : DomoticzLiveEvent()
@@ -30,13 +30,13 @@ class DomoticzRepository(
 ) {
 
     /**
-     * Poll en continu les widgets SCENE uniquement (getscenes). Les
-     * devices ne sont PLUS polles en continu ici : voir
-     * fetchInitialDeviceStates() (etat initial, un seul appel) et
-     * observeLiveUpdates() (mises a jour temps reel via websocket) —
-     * approche "full websocket" pour les devices. Les scenes/groupes
-     * restent en polling REST pur car rien ne confirme qu'elles sont
-     * poussees sur le canal websocket (ressource Domoticz distincte de
+     * Continuously polls SCENE widgets only (getscenes).
+     * devices are NO LONGER continuously polled here: see
+     * fetchInitialDeviceStates() (initial state, single call) and
+     * observeLiveUpdates() (real-time updates via websocket) —
+     * "full websocket" approach for devices. Scenes/groups
+     * remain in pure REST polling because nothing confirms that they are
+     * pushed on the websocket channel (Domoticz resource distinct from
      * getdevices).
      */
     fun observeScenePolling(
@@ -68,8 +68,8 @@ class DomoticzRepository(
                 }.toMap()
                 if (states.isNotEmpty()) emit(states)
             } catch (e: Exception) {
-                // Meme logique que l'ancien observeStates() : on garde les
-                // derniers etats connus et on retentera au prochain cycle.
+                // Same logic as the old observeStates(): we keep the
+                // last known states and will retry in the next cycle.
             }
 
             val jitter = (0..500).random().toLong()
@@ -78,14 +78,13 @@ class DomoticzRepository(
     }
 
     /**
-     * Etat initial des widgets devices (hors scenes), en UN SEUL appel
-     * bulk. A appeler une fois au demarrage et a chaque changement de la
-     * liste de widgets — le websocket (observeLiveUpdates) prend ensuite
-     * le relais pour toute mise a jour ulterieure, sans nouveau poll
-     * periodique. Necessaire car le websocket ne pousse que sur
-     * CHANGEMENT : sans ce fetch initial, un widget resterait vide tant
-     * qu'aucun changement physique n'est survenu depuis l'ouverture de
-     * l'app.
+     * Initial state of device widgets (excluding scenes), in a SINGLE bulk
+     * call. To be called once at startup and at each change of the
+     * widget list — the websocket (observeLiveUpdates) then takes
+     * over for any subsequent updates, without a new periodic
+     * poll. Necessary because the websocket only pushes on
+     * CHANGE: without this initial fetch, a widget would remain empty as
+     * long as no physical change has occurred since the app was opened.
      */
     suspend fun fetchInitialDeviceStates(widgets: List<WidgetConfig>): Map<String, WidgetStateEntry> {
         val deviceWidgets = widgets.filter {
@@ -97,7 +96,7 @@ class DomoticzRepository(
             val allDevices = client.getUsedDevices()
             deviceWidgets.mapNotNull { widget ->
                 val idx = extractIdx(widget) ?: return@mapNotNull null
-                // Fallback individuel pour les devices "unused" absents du bulk.
+                // Individual fallback for "unused" devices absent from bulk.
                 val device = allDevices.firstOrNull { it.idx == idx } ?: client.getDevice(idx)
                 device ?: return@mapNotNull null
                 widget.id to WidgetStateEntry(
@@ -110,19 +109,19 @@ class DomoticzRepository(
     }
 
     /**
-     * Flux temps reel base sur le websocket Domoticz (/json). Reutilise
-     * mapDeviceToState/parseDomoticzLastUpdate — memes regles de mapping
-     * que le polling REST, seule la source du DTO change.
+     * Real-time flow based on the Domoticz websocket (/json). Reuses
+     * mapDeviceToState/parseDomoticzLastUpdate — same mapping rules
+     * as REST polling, only the DTO source changes.
      *
-     * Emet un evenement par device modifie (pas l'etat complet comme
-     * observeStates()) : au ViewModel de fusionner ces deltas avec l'etat
-     * deja connu. Les widgets SCENE ne sont PAS couverts ici : rien ne
-     * confirme que Domoticz pousse les changements de scene/groupe sur ce
-     * canal (ressource distincte de getdevices, cf. getScenes) — a
-     * verifier sur le terrain. Ils restent geres par observeStates().
+     * Emits an event per modified device (not the full state like
+     * observeStates()): for the ViewModel to merge these deltas with the already
+     * known state. SCENE widgets are NOT covered here: nothing
+     * confirms that Domoticz pushes scene/group changes on this
+     * channel (resource distinct from getdevices, cf. getScenes) — to
+     * be verified in the field. They remain managed by observeStates().
      *
-     * Un seul idx peut en theorie alimenter plusieurs widgets (rare mais
-     * le JSON de config le permet) : tous sont mis a jour dans ce cas.
+     * A single idx can in theory feed multiple widgets (rare but
+     * the config JSON allows it): all are updated in this case.
      */
     fun observeLiveUpdates(widgets: List<WidgetConfig>): Flow<DomoticzLiveEvent> {
         val deviceWidgets = widgets.filter {
@@ -153,8 +152,8 @@ class DomoticzRepository(
     }
 
     /**
-     * Liste les devices Domoticz decouvrables, avec leur WidgetType deduit,
-     * pour l'ecran d'ajout de widget.
+     * Lists discoverable Domoticz devices, with their deduced WidgetType,
+     * for the widget addition screen.
      */
     suspend fun discoverDevices(): List<DiscoveredDomoticzDevice> =
         client.getUsedDevices().map { device ->
@@ -166,7 +165,7 @@ class DomoticzRepository(
             )
         }
 
-    /** Meme principe que discoverDevices(), mais pour les scenes/groupes (ressource Domoticz separee). */
+    /** Same principle as discoverDevices(), but for scenes/groups (separate Domoticz resource). */
     suspend fun discoverScenes(): List<DiscoveredDomoticzScene> =
         client.getScenes().map { scene ->
             DiscoveredDomoticzScene(
@@ -212,8 +211,8 @@ class DomoticzRepository(
     }
 
     /**
-     * Declenche une Scene (turnOn doit rester true — Domoticz refuse
-     * "Off" sur une vraie scene) ou bascule un Group on/off.
+     * Triggers a Scene (turnOn must remain true — Domoticz refuses
+     * "Off" on a real scene) or toggles a Group on/off.
      */
     suspend fun triggerScene(widget: WidgetConfig, turnOn: Boolean): Boolean {
         val idx = extractIdx(widget) ?: return false
@@ -221,9 +220,9 @@ class DomoticzRepository(
     }
 
     /**
-     * Historique 24h pour la sparkline, sous-echantillonne a maxPoints
-     * pour ne pas envoyer ~288 points (5min sur 24h) a l'UI pour un
-     * simple mini-graphe. Best-effort : null si indisponible.
+     * 24h history for the sparkline, down-sampled to maxPoints
+     * not to send ~288 points (5min over 24h) to the UI for a
+     * simple mini-graph. Best-effort: null if unavailable.
      */
     suspend fun fetchTemperatureSparkline(widget: WidgetConfig, maxPoints: Int = 48): List<Float>? {
         val idx = extractIdx(widget) ?: return null
@@ -233,10 +232,10 @@ class DomoticzRepository(
         val twentyFourHoursAgo = now - (24 * 3600 * 1000)
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
 
-        // On ne garde que les points des dernieres 24h reels
+        // We only keep the points from the real last 24h
         val points = rawPoints.filter {
             val time = runCatching { dateFormat.parse(it.d ?: "")?.time }.getOrNull()
-            // Si le parsing echoue, on garde le point par securite, sinon on verifie les 24h
+            // If parsing fails, we keep the point for safety, otherwise we check the 24h
             if (time == null) true else time >= twentyFourHoursAgo
         }.mapNotNull { it.te?.toFloatOrNull() }
 
@@ -251,11 +250,11 @@ class DomoticzRepository(
         widget.source?.deviceId?.removePrefix("idx:")
 
     /**
-     * Domoticz renvoie LastUpdate en heure locale du serveur, sans fuseau
-     * horaire explicite. On suppose donc que le serveur Domoticz et
-     * l'appareil Android sont dans le meme fuseau (cas courant : reseau
-     * domestique local). En cas d'echec de parsing, on retombe sur "now"
-     * plutot que de planter ou d'afficher une date invalide.
+     * Domoticz returns LastUpdate in the server's local time, without an explicit
+     * time zone. We therefore assume that the Domoticz server and
+     * the Android device are in the same zone (common case: local
+     * home network). In case of parsing failure, we fall back to "now"
+     * rather than crashing or displaying an invalid date.
      */
     private fun parseDomoticzLastUpdate(raw: String?): Long {
         if (raw.isNullOrBlank()) return System.currentTimeMillis()
@@ -274,8 +273,8 @@ class DomoticzRepository(
                 val isActuallyColor = device.Type?.contains("Color Switch", ignoreCase = true) == true &&
                     subType.contains("RGB", ignoreCase = true)
                 
-                // On considere "White Tunable" les devices Color Switch qui ont "WW" dans leur sous-type
-                // ou qui supportent le RGB (les RGB supportent generalement le blanc variable).
+                // We consider "White Tunable" the Color Switch devices that have "WW" in their sub-type
+                // or that support RGB (RGB usually support variable white).
                 val isWhiteTunable = device.Type?.contains("Color Switch", ignoreCase = true) == true &&
                     (subType.contains("WW", ignoreCase = true) || isActuallyColor)
 
@@ -284,7 +283,7 @@ class DomoticzRepository(
                     isColor = isActuallyColor,
                     isWhiteTunable = isWhiteTunable,
                     brightness = if (type != WidgetType.LIGHT) device.Level else null,
-                    // On extrait la couleur pour tout le monde (RGB ou WW)
+                    // We extract the color for everyone (RGB or WW)
                     colorHex = DomoticzColorParser.parseToHex(device.Color)
                 )
             }
@@ -298,8 +297,8 @@ class DomoticzRepository(
                     ?: if (device.Status?.equals("Open", ignoreCase = true) == true) 100 else 0
             )
 
-            // Le mapping "verrouille" depend du SwitchType configure cote Domoticz
-            // (souvent un switch On/Off generique utilise comme serrure connectee).
+            // The "locked" mapping depends on the SwitchType configured on the Domoticz side
+            // (often a generic On/Off switch used as a connected lock).
             WidgetType.LOCK -> WidgetLiveState.Lock(
                 isLocked = device.Status?.equals("On", ignoreCase = true) == true
             )
@@ -322,10 +321,10 @@ class DomoticzRepository(
         }
 
     /**
-     * Determine la categorie du capteur et calcule une jauge visuelle
-     * uniquement pour les grandeurs naturellement bornees 0-100
-     * (humidite, pourcentage). Pour le reste (pluie, vent, energie...),
-     * pas de jauge : une echelle arbitraire serait trompeuse.
+     * Determines the sensor category and calculates a visual gauge
+     * only for naturally bounded quantities 0-100
+     * (humidity, percentage). For the rest (rain, wind, energy...),
+     * no gauge: an arbitrary scale would be misleading.
      */
     private fun mapSensorState(device: DomoticzDeviceDto): WidgetLiveState.Sensor {
         val type = device.Type.orEmpty()

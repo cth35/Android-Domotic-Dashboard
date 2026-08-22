@@ -18,8 +18,8 @@ private val HomeHabitDarkColors = darkColorScheme(
 
 @Composable
 fun HomeHabitTheme(
-    // Le dark mode est le mode par défaut et actuellement le seul supporté.
-    // isSystemInDarkTheme() reste appelé pour préparer un futur mode clair.
+    // Dark mode is the default and currently the only supported mode.
+    // isSystemInDarkTheme() remains called to prepare for a future light mode.
     useSystemTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {

@@ -1,11 +1,11 @@
 package com.homehabit.app.data.weather
 
 /**
- * Open-Meteo renvoie un code "weather_code" suivant la table WMO (World
- * Meteorological Organization), standard mais pas franchement lisible
- * tel quel. Cette fonction traduit les valeurs les plus courantes en
- * France ; les codes non listes retombent sur un libelle generique
- * plutot que de planter ou d'afficher un nombre brut.
+ * Open-Meteo returns a "weather_code" following the WMO (World
+ * Meteorological Organization) table, standard but not really readable
+ * as is. This function translates the most common values in
+ * France; unlisted codes fall back to a generic label
+ * rather than crashing or displaying a raw number.
  */
 object WeatherCodeMapper {
 

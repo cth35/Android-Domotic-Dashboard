@@ -5,7 +5,7 @@ import java.util.Collections
 
 object NetworkUtils {
 
-    /** Adresse IPv4 locale (Wifi/Ethernet), null si indisponible. */
+    /** Local IPv4 address (Wifi/Ethernet), null if unavailable. */
     fun getLocalIpAddress(): String? = runCatching {
         Collections.list(NetworkInterface.getNetworkInterfaces())
             .asSequence()
@@ -13,7 +13,7 @@ object NetworkUtils {
             .filter { it.isUp }
             .flatMap { Collections.list(it.inetAddresses).asSequence() }
             .filterNot { it.isLoopbackAddress }
-            .firstOrNull { it.hostAddress?.contains(':') == false } // IPv4 uniquement
+            .firstOrNull { it.hostAddress?.contains(':') == false } // IPv4 only
             ?.hostAddress
     }.getOrNull()
 }

@@ -33,8 +33,8 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /**
- * Palette de presets plutot qu'un vrai color picker HSV : suffisant pour
- * une Hue, plus simple a utiliser au doigt sur un ecran mural.
+ * Preset palette rather than a real HSV color picker: sufficient for
+ * a Hue, easier to use with a finger on a wall screen.
  */
 private val COLOR_PRESETS = listOf(
     "#FF3B30", "#FF9500", "#FFD60A", "#34C759", "#0A84FF", "#AF52DE", "#FF2D9B"
@@ -44,7 +44,7 @@ private val WHITE_PRESETS = listOf(
     "#FFAE00", "#FFD27D", "#FFE9C6", "#F5F8FF", "#D1EAFF"
 )
 
-/** Delai d'inactivite avant fermeture automatique, apres la derniere action (brightness ou couleur). */
+/** Inactivity delay before automatic closure, after the last action (brightness or color). */
 private const val AUTO_CLOSE_DELAY_MS = 2_000L
 
 @Composable

@@ -9,13 +9,13 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
- * Source de vérité unique pour la config du dashboard. Partagée entre
- * DashboardViewModel (lecture + écriture via drag/resize, ajout de
- * widget) et le serveur HTTP embarqué (lecture + écriture via
- * navigateur). Toute modification, quelle que soit son origine, passe
- * par updateConfig() : elle est aussitôt persistée sur disque et
- * republiée dans configFlow, donc les deux "clients" restent synchronisés
- * sans mécanisme supplémentaire.
+ * Single source of truth for the dashboard config. Shared between
+ * DashboardViewModel (read + write via drag/resize, adding
+ * widgets) and the embedded HTTP server (read + write via
+ * browser). Any modification, whatever its origin, passes
+ * through updateConfig(): it is immediately persisted to disk and
+ * republished in configFlow, so both "clients" remain synchronized
+ * without additional mechanisms.
  */
 class ConfigRepository(context: Context) {
 
@@ -35,13 +35,13 @@ class ConfigRepository(context: Context) {
 
     fun current(): DashboardConfig = _configFlow.value
 
-    /** Remplace la config courante, la persiste et notifie tous les observateurs. */
+    /** Replaces the current config, persists it, and notifies all observers. */
     fun updateConfig(newConfig: DashboardConfig) {
         configFile.writeText(serialize(newConfig))
         _configFlow.value = newConfig
     }
 
-    /** Utilisé par le serveur HTTP : parse puis applique un JSON brut reçu du navigateur. */
+    /** Used by the HTTP server: parses and then applies a raw JSON received from the browser. */
     fun updateFromJson(rawJson: String): Result<DashboardConfig> = runCatching {
         val parsed = parse(rawJson)
         updateConfig(parsed)
@@ -55,11 +55,11 @@ class ConfigRepository(context: Context) {
         json.decodeFromString(DashboardConfig.serializer(), rawJson)
 
     /**
-     * Au premier lancement (pas encore de fichier en stockage interne),
-     * on repart de l'asset embarqué dans l'APK et on le copie en
-     * stockage interne pour qu'il devienne modifiable. Dans tous les
-     * cas, on s'assure qu'un token d'auth existe (genere une seule fois,
-     * jamais regenere ensuite tant qu'il n'est pas vide).
+     * On first launch (no file in internal storage yet),
+     * we start from the asset embedded in the APK and copy it to
+     * internal storage so it becomes modifiable. In all cases,
+     * we ensure an auth token exists (generated once,
+     * never regenerated thereafter as long as it is not empty).
      */
     private fun loadInitialConfig(): DashboardConfig {
         val file = configFile
@@ -74,10 +74,10 @@ class ConfigRepository(context: Context) {
     }
 
     /**
-     * Genere un token une seule fois si absent (asset par defaut ne
-     * porte pas de token en dur, volontairement — chaque installation
-     * doit avoir le sien). Alphabet sans caracteres ambigus (pas de 0/O,
-     * 1/I/L) car l'utilisateur doit le retaper dans un navigateur.
+     * Generates a token only once if absent (default asset does not
+     * carry a hardcoded token, intentionally — each installation
+     * must have its own). Alphabet without ambiguous characters (no 0/O,
+     * 1/I/L) because the user must re-type it in a browser.
      */
     private fun ensureHttpAuthToken(config: DashboardConfig): DashboardConfig {
         if (config.settings.httpAuthToken.isNotBlank()) return config

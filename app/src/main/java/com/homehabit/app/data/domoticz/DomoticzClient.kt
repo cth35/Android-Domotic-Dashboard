@@ -14,11 +14,11 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 /**
- * Client pour l'API JSON de Domoticz (/json.htm). Reste volontairement
- * simple : un appel = une requete GET avec parametres de query, comme
- * l'attend Domoticz. Pas de dependance a une lib de reflexion type
- * Retrofit, l'API est trop heterogene d'un type d'appareil a l'autre
- * pour que ca apporte grand chose.
+ * Client for the Domoticz JSON API (/json.htm). Intentionally remains
+ * simple: one call = one GET request with query parameters, as
+ * Domoticz expects. No dependency on a reflection library like
+ * Retrofit, the API is too heterogeneous from one device type to another
+ * for that to be very useful.
  */
 class DomoticzClient(private val config: DomoticzConfig) {
 
@@ -45,7 +45,7 @@ class DomoticzClient(private val config: DomoticzConfig) {
         }
     }
 
-    /** Recupere l'etat courant d'un device via son idx Domoticz. */
+    /** Retrieves the current state of a device via its Domoticz idx. */
     suspend fun getDevice(idx: String): DomoticzDeviceDto? = runCatching {
         val response: DomoticzDevicesResponse = httpClient.get("${config.baseUrl}/json.htm") {
             parameter("type", "command")
@@ -56,8 +56,8 @@ class DomoticzClient(private val config: DomoticzConfig) {
     }.getOrNull()
 
     /**
-     * Liste tous les devices "used" (configures et visibles) cote Domoticz.
-     * Utilise pour la decouverte lors de l'ajout d'un widget.
+     * Lists all "used" devices (configured and visible) on the Domoticz side.
+     * Used for discovery when adding a widget.
      */
     suspend fun getUsedDevices(): List<DomoticzDeviceDto> = runCatching {
         val response: DomoticzDevicesResponse = httpClient.get("${config.baseUrl}/json.htm") {
@@ -96,9 +96,9 @@ class DomoticzClient(private val config: DomoticzConfig) {
     }.getOrDefault(false)
 
     /**
-     * Change la couleur (et optionnellement la luminosite) d'une lumiere
-     * RGB/RGBW type Hue. Reconstruit le JSON "Color" attendu par Domoticz
-     * en mode RGB explicite (m=3).
+     * Changes the color (and optionally the brightness) of an RGB/RGBW light
+     * like Hue. Reconstructs the "Color" JSON expected by Domoticz
+     * in explicit RGB mode (m=3).
      */
     suspend fun setColor(idx: String, hex: String, brightnessPercent: Int? = null): Boolean = runCatching {
         val (r, g, b) = DomoticzColorParser.hexToRgb(hex)
@@ -133,10 +133,10 @@ class DomoticzClient(private val config: DomoticzConfig) {
     }.getOrDefault(false)
 
     /**
-     * Historique de temperature des dernieres 24h (points ~5min selon la
-     * config Domoticz). Utilise pour la sparkline des widgets temperature.
-     * Best-effort : retourne null si l'appel echoue ou si le device n'a
-     * pas de temperature (ex. capteur non-temp), plutot que de planter.
+     * Temperature history of the last 24h (points ~5min depending on
+     * Domoticz config). Used for the sparkline of temperature widgets.
+     * Best-effort: returns null if the call fails or if the device does not
+     * have temperature (e.g., non-temp sensor), rather than crashing.
      */
     suspend fun getTempGraphDay(idx: String): List<DomoticzGraphPointDto>? = runCatching {
         val response: DomoticzGraphResponse = httpClient.get("${config.baseUrl}/json.htm") {
@@ -150,8 +150,8 @@ class DomoticzClient(private val config: DomoticzConfig) {
     }.getOrNull()
 
     /**
-     * Liste toutes les scenes/groupes configures cote Domoticz. Ressource
-     * distincte de getdevices — meme motif GET, mais table Domoticz a part.
+     * Lists all configured scenes/groups on the Domoticz side. Distinct
+     * resource from getdevices — same GET pattern, but separate Domoticz table.
      */
     suspend fun getScenes(): List<DomoticzSceneDto> = runCatching {
         val response: DomoticzScenesResponse = httpClient.get("${config.baseUrl}/json.htm") {
@@ -162,9 +162,9 @@ class DomoticzClient(private val config: DomoticzConfig) {
     }.getOrDefault(emptyList())
 
     /**
-     * Declenche une scene (switchCmd doit rester "On" — Domoticz n'autorise
-     * pas "Off" sur une vraie Scene, seulement sur un Group) ou bascule
-     * un groupe on/off.
+     * Triggers a scene (switchCmd must remain "On" — Domoticz does not allow
+     * "Off" on a real Scene, only on a Group) or toggles
+     * a group on/off.
      */
     suspend fun switchScene(idx: String, switchCmd: String): Boolean = runCatching {
         val response = httpClient.get("${config.baseUrl}/json.htm") {

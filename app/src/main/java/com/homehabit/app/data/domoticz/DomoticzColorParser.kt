@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Gère le parsing des couleurs Domoticz (RGB et Température de blanc).
+ * Gï¿½re le parsing des couleurs Domoticz (RGB et Tempï¿½rature de blanc).
  */
 object DomoticzColorParser {
 
@@ -15,15 +15,15 @@ object DomoticzColorParser {
         val dto = runCatching { json.decodeFromString<ColorDto>(raw) }.getOrNull() ?: return null
         
         return when (dto.m) {
-            3 -> { // Mode RGB
+            3 -> { // RGB Mode
                 val r = dto.r ?: 0
                 val g = dto.g ?: 0
                 val b = dto.b ?: 0
                 if (r == 0 && g == 0 && b == 0) return null
                 "#%02X%02X%02X".format(r.coerceIn(0, 255), g.coerceIn(0, 255), b.coerceIn(0, 255))
             }
-            2 -> { // Mode Température de blanc (WW)
-                // t va de 0 (froid) à 255 (chaud) ou inversement selon le hardware.
+            2 -> { // Mode Tempï¿½rature de blanc (WW)
+                // t va de 0 (froid) ï¿½ 255 (chaud) ou inversement selon le hardware.
                 // On fait une approximation visuelle pour le dashboard.
                 val temp = dto.t ?: 128
                 approximateWhiteTempToHex(temp)
@@ -33,12 +33,12 @@ object DomoticzColorParser {
     }
 
     /**
-     * Convertit une valeur de température Domoticz (0-255) en couleur hexadécimale
-     * pour l'affichage visuel (ambiance chaude à froide).
+     * Convertit une valeur de tempï¿½rature Domoticz (0-255) en couleur hexadï¿½cimale
+     * pour l'affichage visuel (ambiance chaude ï¿½ froide).
      */
     private fun approximateWhiteTempToHex(t: Int): String {
         val factor = t.coerceIn(0, 255) / 255f
-        // Dégradé de #D1EAFF (froid, t=0) vers #FFAE00 (chaud, t=255)
+        // Dï¿½gradï¿½ de #D1EAFF (froid, t=0) vers #FFAE00 (chaud, t=255)
         val r = (209 + (255 - 209) * factor).toInt()
         val g = (234 + (174 - 234) * factor).toInt()
         val b = (255 + (0 - 255) * factor).toInt()

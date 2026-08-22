@@ -19,21 +19,21 @@ import org.videolan.libvlc.util.VLCVideoLayout
 import kotlin.coroutines.resume
 
 /**
- * Capture "best effort" d'une unique image depuis un flux RTSP, utilisée
- * comme snapshot de secours quand aucune url_snapshot n'est configurée
- * pour un widget caméra.
+ * "Best effort" capture of a single image from an RTSP stream, used
+ * as a backup snapshot when no url_snapshot is configured
+ * for a camera widget.
  *
- * Volontairement best-effort et non garanti : ouvre une vraie connexion
- * RTSP le temps de récupérer une frame (coûteux, ~quelques secondes),
- * et la méthode de capture dépend du rendu interne de libVLC :
- * - TextureView (rendu logiciel ou certains devices) : `getBitmap()`
- *   direct, fonctionne sur toutes les versions supportées (API 23+).
- * - SurfaceView (rendu matériel, le plus courant) : nécessite `PixelCopy`,
- *   disponible seulement à partir d'Android 7.0 (API 24).
- * Si la capture échoue pour n'importe quelle raison (device trop ancien,
- * flux qui ne démarre pas, timeout, vue introuvable), la fonction
- * retourne simplement `null` : l'appelant retombe alors sur un
- * placeholder générique, ce n'est pas bloquant.
+ * Voluntarily best-effort and not guaranteed: opens a real RTSP
+ * connection long enough to retrieve a frame (costly, ~a few seconds),
+ * and the capture method depends on the internal rendering of libVLC:
+ * - TextureView (software rendering or some devices): direct `getBitmap()`,
+ *   works on all supported versions (API 23+).
+ * - SurfaceView (hardware rendering, the most common): requires `PixelCopy`,
+ *   available only from Android 7.0 (API 24).
+ * If the capture fails for any reason (device too old,
+ * stream not starting, timeout, view not found), the function
+ * returns simply `null`: the caller then falls back to a
+ * generic placeholder, this is not blocking.
  */
 class RtspThumbnailGrabber(private val context: Context) {
 
@@ -66,8 +66,8 @@ class RtspThumbnailGrabber(private val context: Context) {
 
             mediaPlayer.setEventListener { event ->
                 if (event.type == MediaPlayer.Event.Playing && !resolved) {
-                    // Court delai pour laisser une vraie frame se dessiner
-                    // avant de tenter la capture.
+                    // Short delay to let a real frame be drawn
+                    // before attempting capture.
                     handler.postDelayed({
                         if (resolved) return@postDelayed
                         handler.removeCallbacks(timeoutRunnable)
@@ -83,8 +83,8 @@ class RtspThumbnailGrabber(private val context: Context) {
 
             mediaPlayer.attachViews(layout, null, false, false)
             val media = Media(libVLC, Uri.parse(rtspUrl))
-            // IMPORTANT: Désactivation matérielle pour éviter "FrameInsert open fail"
-            // sur Mediatek/Unisoc lors d'une capture hors-écran.
+            // IMPORTANT: Hardware deactivation to avoid "FrameInsert open fail"
+            // on Mediatek/Unisoc during off-screen capture.
             media.setHWDecoderEnabled(false, false)
             media.addOption(":network-caching=1500")
             media.addOption(":rtsp-tcp")
@@ -113,8 +113,8 @@ class RtspThumbnailGrabber(private val context: Context) {
                         onResult(if (result == PixelCopy.SUCCESS) bitmap else null)
                     }, handler)
                 } else {
-                    // PixelCopy indisponible avant API 24 : pas de capture possible
-                    // depuis un SurfaceView sur ces versions.
+                    // PixelCopy unavailable before API 24: no capture possible
+                    // from a SurfaceView on these versions.
                     onResult(null)
                 }
             }

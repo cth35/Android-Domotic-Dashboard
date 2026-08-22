@@ -11,19 +11,19 @@ val TextSecondary = Color(0xFF7A7D85)
 val TextMuted = Color(0xFF5A5C62)
 
 /**
- * Convention de couleur (icones + fonds teintes des widgets), a suivre
- * pour tout nouveau widget plutot que d'inventer une nouvelle teinte :
- * - AccentGreen(+Surface)  : etat actif/engage (lumiere allumee, volet
- *   ouvert, scene/groupe actif) — "ca fait quelque chose en ce moment"
- * - AccentRed(+Surface)    : etat d'attention/alerte (serrure
- *   deverrouillee) — jamais utilise pour un simple "actif", uniquement
- *   quand l'etat merite un coup d'oeil
- * - AccentOrange           : chaleur/energie (temperature, thermostat,
- *   UV, conso electrique)
- * - AccentBlueMuted        : grandeurs "froides"/informatives (humidite,
- *   pluie, meteo)
- * - TextSecondary/TextMuted: etat neutre/inactif/inconnu — jamais de
- *   fond teinte associe, juste l'icone en gris
+ * Color convention (icons + tinted widget backgrounds), to follow
+ * for any new widget instead of inventing a new shade:
+ * - AccentGreen(+Surface): active/engaged state (light on, shutter
+ *   open, active scene/group) — "it's doing something right now"
+ * - AccentRed(+Surface): attention/alert state (unlocked
+ *   lock) — never used for a simple "active", only
+ *   when the state deserves a look
+ * - AccentOrange: heat/energy (temperature, thermostat,
+ *   UV, electricity consumption)
+ * - AccentBlueMuted: "cold"/informative quantities (humidity,
+ *   rain, weather)
+ * - TextSecondary/TextMuted: neutral/inactive/unknown state — never any
+ *   associated tinted background, just the icon in gray
  */
 val AccentBlue = Color(0xFF4A90D9)
 val AccentGreen = Color(0xFFA8D67A)

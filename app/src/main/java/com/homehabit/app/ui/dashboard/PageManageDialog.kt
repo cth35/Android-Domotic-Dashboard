@@ -35,8 +35,8 @@ import com.homehabit.app.ui.theme.TextPrimary
 import com.homehabit.app.ui.theme.TextSecondary
 
 /**
- * Permet de renommer une page ou de changer le nombre de colonnes de sa
- * grille (pour s'adapter a la taille de l'ecran).
+ * Allows to rename a page or change the number of columns of its
+ * grid (to adapt to the screen size).
  */
 @Composable
 fun PageManageDialog(

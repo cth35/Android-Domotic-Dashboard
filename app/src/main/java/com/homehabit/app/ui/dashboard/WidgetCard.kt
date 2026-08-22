@@ -58,8 +58,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * "à l'instant" / "il y a Xmin" / "il y a Xh" en dessous de 24h,
- * date jour/mois au-dela.
+ * "just now" / "Xmin ago" / "Xh ago" under 24h,
+ * day/month date beyond.
  */
 fun formatRelativeTime(epochMillis: Long, now: Long = System.currentTimeMillis()): String {
     val diffMs = (now - epochMillis).coerceAtLeast(0)
@@ -76,10 +76,10 @@ fun formatRelativeTime(epochMillis: Long, now: Long = System.currentTimeMillis()
 
 
 /**
- * Affiche le contenu d'un widget selon son type. Les icônes utilisent
- * Material Icons ici comme placeholder ; elles seront remplacées par
- * Android-Iconics + FontAwesome dans une étape suivante (même
- * emplacement d'appel, signature identique).
+ * Displays the content of a widget according to its type. Icons use
+ * Material Icons here as a placeholder; they will be replaced by
+ * Android-Iconics + FontAwesome in a following step (same
+ * call location, identical signature).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -102,8 +102,8 @@ fun WidgetCard(
     val shutter = state as? WidgetLiveState.Shutter
     val lock = state as? WidgetLiveState.Lock
 
-    // On reste sur un fond sombre uniforme type HomeHabit, sauf feedback
-    // tres spécifique (ex: alerte lock).
+    // We stay on a uniform dark background like HomeHabit, except for
+    // very specific feedback (e.g., lock alert).
     val backgroundColor = when (config.widgetType) {
         WidgetType.LOCK -> if (lock?.isLocked == false) AccentRedSurface else SurfaceDark
         else -> SurfaceDark
@@ -119,7 +119,7 @@ fun WidgetCard(
                 } else it
             }
     ) {
-        // Overlay Camera : prend tout l'espace
+        // Camera Overlay: takes all space
         if (config.widgetType == WidgetType.CAMERA || config.widgetType == WidgetType.CLOCK) {
             when (config.widgetType) {
                 WidgetType.CAMERA -> CameraContent(config, state as? WidgetLiveState.Camera)
@@ -133,7 +133,7 @@ fun WidgetCard(
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header : Label custom ou nom Domoticz en repli
+                // Header: Custom label or Domoticz name fallback
                 Text(
                     text = config.label.takeIf { !it.isNullOrBlank() } ?: entry?.fallbackName ?: "",
                     color = TextPrimary,
@@ -151,7 +151,7 @@ fun WidgetCard(
                 Spacer(Modifier.height(2.dp))
                 Spacer(Modifier.weight(0.5f))
 
-                // Contenu central
+                // Central content
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -348,12 +348,12 @@ private fun WeatherContent(state: WidgetLiveState.Weather?) {
 }
 
 /**
- * Prevision 7 jours, en ligne defilable horizontalement (fonctionne
- * quelle que soit la taille du widget, meme etroit — recommande en
- * largeur w=4 dans l'exemple JSON pour voir plusieurs jours sans avoir
- * a swiper). Pas teste sur device reel : le scroll horizontal a
- * l'interieur d'un widget pourrait entrer en conflit avec le swipe de
- * page du HorizontalPager en dehors du mode edition — a valider.
+ * 7-day forecast, in a horizontally scrollable line (works
+ * regardless of the widget size, even narrow — recommended in
+ * width w=4 in the JSON example to see several days without having
+ * to swipe). Not tested on real device: horizontal scroll
+ * inside a widget could conflict with the page swipe of the
+ * HorizontalPager outside of edit mode — to be validated.
  */
 @Composable
 private fun ForecastContent(state: WidgetLiveState.Forecast?) {
@@ -402,7 +402,7 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
     }
 }
 
-/** Mapping large des codes WMO vers une icone — meme esprit que WeatherCodeMapper mais pour le glyphe plutot que le libelle. */
+/** Broad mapping of WMO codes to an icon — same spirit as WeatherCodeMapper but for the glyph rather than the label. */
 internal fun iconForWeatherCode(code: Int?): ImageVector = when (code) {
     0 -> Icons.Filled.WbSunny
     1, 2 -> Icons.Filled.WbCloudy
@@ -414,7 +414,7 @@ internal fun iconForWeatherCode(code: Int?): ImageVector = when (code) {
     else -> Icons.Filled.Cloud
 }
 
-/** Couleurs specifiques selon le type de temps pour une meilleure lisibilite. */
+/** Specific colors according to weather type for better readability. */
 internal fun colorForWeatherCode(code: Int?): Color = when (code) {
     0 -> AccentOrange
     1, 2, 3 -> TextSecondary
@@ -429,8 +429,8 @@ internal fun colorForWeatherCode(code: Int?): Color = when (code) {
 private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
     val isOn = state?.isOn == true
     
-    // On affiche la couleur/nuance si disponible dans l'état, 
-    // quel que soit le type de widget (RGB ou WW).
+    // We display the color/shade if available in the state, 
+    // regardless of the widget type (RGB or WW).
     val swatchColor = if (isOn) {
         state?.colorHex?.let { hex ->
             runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrNull()
@@ -444,7 +444,7 @@ private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
         Box(
             modifier = Modifier
                 .size(44.dp)
-                // On retire le clip ici pour permettre à la lueur de déborder
+                // We remove the clip here to allow the glow to overflow
                 .drawBehind {
                     if (isOn) {
                         val glowColor = (swatchColor ?: color)
@@ -478,7 +478,7 @@ private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
             Spacer(Modifier.height(6.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.clickable { /* Clic géré par le parent via onLongClick */ }
+                modifier = Modifier.clickable { /* Click handled by the parent via onLongClick */ }
             ) {
                 listOf("#4A90D9", "#A8D67A", "#E8B26A", "#E35B5B").forEach { hex ->
                     Box(
@@ -612,7 +612,7 @@ private fun SensorContent(state: WidgetLiveState.Sensor?, sparkline: List<Float>
     val isTemp = state?.kind == SensorKind.TEMPERATURE
     
     val kindUnit = when (state?.kind) {
-        SensorKind.TEMPERATURE -> "" // Affiché via ° à côté de la valeur
+        SensorKind.TEMPERATURE -> "" // Displayed via ° next to the value
         SensorKind.HUMIDITY -> "PERCENT"
         else -> unit?.uppercase() ?: ""
     }
@@ -729,7 +729,7 @@ private fun CameraContent(config: WidgetConfig, state: WidgetLiveState.Camera?) 
     }
 }
 
-/** Snapshot HTTP, rafraichi periodiquement (cache-busting simple sur l'url). */
+/** HTTP Snapshot, periodically refreshed (simple cache-busting on the url). */
 @Composable
 private fun SnapshotImage(url: String, refreshMs: Long, contentScale: ContentScale) {
     var tick by remember(url) { mutableStateOf(System.currentTimeMillis()) }
@@ -743,9 +743,9 @@ private fun SnapshotImage(url: String, refreshMs: Long, contentScale: ContentSca
         if (url.contains("?")) "$url&_t=$tick" else "$url?_t=$tick"
     }
 
-    // On garde le dernier painter réussi pour l'utiliser en fond pendant
-    // que la nouvelle image charge, garantissant un rafraîchissement
-    // sans aucun flickering (zéro flash).
+    // We keep the last successful painter to use as background while
+    // the new image loads, guaranteeing a refresh
+    // without any flickering (zero flash).
     var lastSuccessPainter by remember(url) { mutableStateOf<Painter?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -760,7 +760,7 @@ private fun SnapshotImage(url: String, refreshMs: Long, contentScale: ContentSca
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(bustedUrl)
-                .memoryCacheKey(url) // Clé stable pour partage avec la modale
+                .memoryCacheKey(url) // Stable key for sharing with the modal
                 .diskCacheKey(url)
                 .memoryCachePolicy(CachePolicy.WRITE_ONLY)
                 .diskCachePolicy(CachePolicy.DISABLED)
@@ -777,12 +777,12 @@ private fun SnapshotImage(url: String, refreshMs: Long, contentScale: ContentSca
 }
 
 /**
- * Fallback best-effort quand aucune url_snapshot n'est configuree : tente
- * de capturer une frame du flux RTSP. Plus couteux qu'un simple GET HTTP
- * (ouvre une vraie connexion RTSP), donc l'intervalle reel est au moins
- * de 30s quel que soit refreshSeconds. En cas d'echec (device trop
- * ancien, flux indisponible...) on retombe simplement sur le placeholder,
- * ce n'est pas bloquant.
+ * Best-effort fallback when no url_snapshot is configured: attempts
+ * to capture a frame from the RTSP stream. More costly than a simple HTTP GET
+ * (opens a real RTSP connection), so the actual interval is at least
+ * 30s regardless of refreshSeconds. In case of failure (device too
+ * old, stream unavailable...) we simply fall back to the placeholder,
+ * it's not blocking.
  */
 @Composable
 private fun RtspFallbackThumbnail(rtspUrl: String, refreshMs: Long, contentScale: ContentScale) {
@@ -852,7 +852,7 @@ private fun splitValueAndUnit(displayValue: String): Pair<String, String?> {
         val unit = trimmed.substring(firstSpace + 1).trim()
         return value to unit
     }
-    // Cas spécial pour les valeurs collées type "25C" ou "60%"
+    // Special case for joined values like "25C" or "60%"
     val lastDigit = trimmed.indexOfLast { it.isDigit() }
     if (lastDigit != -1 && lastDigit < trimmed.length - 1) {
         return trimmed.substring(0, lastDigit + 1) to trimmed.substring(lastDigit + 1)

@@ -1,9 +1,9 @@
 package com.homehabit.app.data
 
 /**
- * Catégorie d'un capteur générique, utilisée pour choisir l'icône et
- * déterminer si une jauge visuelle a un sens (uniquement pour les
- * grandeurs naturellement bornées 0-100).
+ * Category of a generic sensor, used to choose the icon and
+ * determine if a visual gauge makes sense (only for
+ * naturally bounded values 0-100).
  */
 enum class SensorKind {
     TEMPERATURE,

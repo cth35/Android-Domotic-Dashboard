@@ -10,15 +10,15 @@ import com.homehabit.app.power.NightModeSchedule
 import kotlinx.coroutines.delay
 
 /**
- * Ajuste la luminosite de la fenetre selon l'horaire configure (mode
- * nuit). Ne necessite aucune permission — screenBrightness sur les
- * attributs de la fenetre ne s'applique qu'a cette activite, pas au
- * systeme entier, donc toujours fiable contrairement a l'extinction
- * reelle (voir ScreenPowerController pour cette partie plus fragile).
+ * Adjusts the window brightness according to the configured schedule (night
+ * mode). Requires no permission — screenBrightness on window
+ * attributes only applies to this activity, not the whole
+ * system, so always reliable unlike actual shutdown
+ * (see ScreenPowerController for this more fragile part).
  *
- * Verifie toutes les 60s plutot qu'en continu : largement suffisant
- * pour une transition qui se joue a l'heure pres, evite de reveiller
- * la composition inutilement.
+ * Checks every 60s rather than continuously: largely sufficient
+ * for a transition that plays out to the hour, avoids waking up
+ * the composition unnecessarily.
  */
 @Composable
 fun NightModeEffect(settings: AppSettings) {

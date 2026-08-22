@@ -49,7 +49,7 @@ fun WeatherDetailsModal(
                 
                 Spacer(Modifier.height(32.dp))
                 
-                // Température et Condition
+                // Temperature and Condition
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = iconForWeatherCode(state.weatherCode),
@@ -67,7 +67,7 @@ fun WeatherDetailsModal(
                         )
                         Text(
                             text = state.condition,
-                            color = TextPrimary, // Plus contrasté
+                            color = TextPrimary, // Higher contrast
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -86,7 +86,7 @@ fun WeatherDetailsModal(
                 HorizontalDivider(color = SurfaceVariantDark, thickness = 1.dp)
                 Spacer(Modifier.height(32.dp))
 
-                // Grille de détails
+                // Detail grid
                 Row(modifier = Modifier.fillMaxWidth()) {
                     WeatherDetailItem(
                         icon = Icons.Filled.WaterDrop,
@@ -153,7 +153,7 @@ private fun WeatherDetailItem(
             modifier = Modifier.size(24.dp)
         )
         Spacer(Modifier.height(6.dp))
-        Text(text = label, color = TextSecondary, fontSize = 12.sp) // TextSecondary au lieu de Muted
+        Text(text = label, color = TextSecondary, fontSize = 12.sp) // TextSecondary instead of Muted
         Text(text = value, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }

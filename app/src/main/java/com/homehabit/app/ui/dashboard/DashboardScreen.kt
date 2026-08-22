@@ -81,7 +81,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     var lightModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var managePageIndex by remember { mutableStateOf<Int?>(null) }
 
-    // Gestion de l'affichage automatique des controles (Auto-hide)
+    // Management of the automatic display of controls (Auto-hide)
     var controlsVisible by remember { mutableStateOf(false) }
     var lastInteractionTime by remember { mutableLongStateOf(0L) }
 
@@ -99,7 +99,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
 
     val pagerState = rememberPagerState(pageCount = { pages.size.coerceAtLeast(1) })
     
-    // Extraction du lever/coucher du soleil depuis le premier widget meteo dispo
+    // Extraction of sunrise/sunset from the first available weather widget
     val weatherData = widgetStates.values.mapNotNull { it.state }.firstOrNull { 
         it is WidgetLiveState.Weather || it is WidgetLiveState.Forecast 
     }
@@ -110,8 +110,8 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     }
     val scope = rememberCoroutineScope()
 
-    // Garde le ViewModel informe de la page visible : addWidget() en a
-    // besoin pour savoir ou placer un nouveau widget.
+    // Keeps the ViewModel informed of the visible page: addWidget() needs
+    // it to know where to place a new widget.
     LaunchedEffect(pagerState.currentPage) {
         viewModel.setCurrentPage(pagerState.currentPage)
     }
@@ -355,7 +355,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
         val light = widgetStates[widget.id]?.state as? WidgetLiveState.Light
         LightAdjustDialog(
             label = widget.label ?: "Lumiere",
-            // On se base sur l'etat live pour savoir quoi afficher
+            // We rely on the live state to know what to display
             isColorLight = light?.isColor == true,
             isWhiteTunable = light?.isWhiteTunable == true,
             currentBrightness = light?.brightness ?: 100,
@@ -372,17 +372,17 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
 }
 
 /**
- * Badge global d'etat de connexion au serveur Domoticz, base sur le
- * canal websocket temps reel (DashboardViewModel.isDomoticzLiveConnected).
- * Invisible tant que tout va bien ; apparait des que la connexion est
- * perdue, avec un delai de grace pour ne pas clignoter au demarrage de
- * l'app le temps que le tout premier handshake s'etablisse.
+ * Global connection status badge to the Domoticz server, based on the
+ * real-time websocket channel (DashboardViewModel.isDomoticzLiveConnected).
+ * Invisible as long as everything is fine; appears as soon as the connection is
+ * lost, with a grace period not to flash at app startup
+ * while the very first handshake is established.
  *
- * Volontairement independant du polling REST des scenes : ce badge ne
- * reflete que l'etat du websocket, qui couvre l'essentiel des widgets
- * (lumieres, volets, capteurs...). Si le serveur est completement injoignable
- * (ex. coupe pour maintenance), le websocket tombe aussi, donc le badge
- * s'affiche correctement dans ce cas — c'est le scenario vise.
+ * Intentionally independent of the REST polling of scenes: this badge only
+ * reflects the state of the websocket, which covers most widgets
+ * (lights, shutters, sensors...). If the server is completely unreachable
+ * (e.g., down for maintenance), the websocket also falls, so the badge
+ * displays correctly in this case — this is the targeted scenario.
  */
 @Composable
 private fun ConnectionStatusBadge(isConnected: Boolean, modifier: Modifier = Modifier) {
@@ -392,9 +392,9 @@ private fun ConnectionStatusBadge(isConnected: Boolean, modifier: Modifier = Mod
         if (isConnected) {
             showBadge = false
         } else {
-            // Delai de grace : le tout premier handshake au lancement de
-            // l'app prend generalement 1-2s, pas la peine d'alarmer
-            // l'utilisateur pour ca. Au-dela, la coupure est reelle.
+            // Grace period: the very first handshake at app launch
+            // generally takes 1-2s, no need to alarm
+            // the user for that. Beyond that, the cut is real.
             delay(8_000)
             showBadge = true
         }
@@ -432,9 +432,9 @@ private fun ConnectionStatusBadge(isConnected: Boolean, modifier: Modifier = Mod
 }
 
 /**
- * Petit wrapper pour garder le corps de DashboardScreen lisible : affiche
- * PageManageDialog si un index de page est en cours d'edition (long-press
- * sur un onglet).
+ * Small wrapper to keep the body of DashboardScreen readable: displays
+ * PageManageDialog if a page index is being edited (long-press
+ * on a tab).
  */
 @Composable
 private fun ManageDialogHost(
@@ -463,19 +463,19 @@ private fun ManageDialogHost(
 }
 
 /**
- * Grille libre : chaque widget est positionné en absolu à partir de ses
- * coordonnées (x, y) et dimensionné selon (w, h), en unités de cellule.
- * Les cases non occupées restent simplement vides en dehors d'un drag.
- * Opère sur UNE page a la fois (grid + widgets), page-agnostic autrement
- * — c'est l'appelant (DashboardScreen, dans le pager) qui choisit quelle
- * page afficher.
+ * Free grid: each widget is positioned absolutely from its
+ * coordinates (x, y) and sized according to (w, h), in cell units.
+ * Unoccupied cells simply remain empty outside of a drag.
+ * Operates on ONE page at a time (grid + widgets), page-agnostic otherwise
+ * — it is the caller (DashboardScreen, in the pager) who chooses which
+ * page to display.
  *
- * Pendant un drag de repositionnement, un aperçu (GridEngine.resolvePushLayout)
- * est calculé en continu et animé pour tous les widgets sauf celui qu'on
- * déplace (qui suit le doigt brut, sans lag). Rien n'est persisté avant
- * le relâchement : si le doigt s'éloigne d'une zone avant de lâcher, les
- * widgets qu'on avait poussés reviennent naturellement à leur position
- * d'origine (le calcul est refait à chaque évènement de drag).
+ * During a repositioning drag, a preview (GridEngine.resolvePushLayout)
+ * is calculated continuously and animated for all widgets except the one being
+ * moved (which follows the raw finger, without lag). Nothing is persisted before
+ * the release: if the finger moves away from an area before releasing, the
+ * widgets that had been pushed naturally return to their original position
+ * (the calculation is redone at each drag event).
  */
 @Composable
 private fun DashboardGrid(
@@ -493,8 +493,8 @@ private fun DashboardGrid(
     var containerHeightPx by remember { mutableIntStateOf(0) }
     var dragState by remember { mutableStateOf<DragUiState?>(null) }
 
-    // Si on quitte le mode édition, on force le reset du drag state local
-    // pour éviter que des widgets ne restent grisés (alpha 0.6).
+    // If we leave the edit mode, we force the reset of the local drag state
+    // to avoid widgets remaining grayed out (alpha 0.6).
     LaunchedEffect(isEditMode) {
         if (!isEditMode) {
             dragState = null
@@ -525,11 +525,11 @@ private fun DashboardGrid(
         val isFitMode = gridConfig.rows > 0
         val rows = if (isFitMode) gridConfig.rows else 0
         
-        // En mode Fit, on calcule la hauteur de cellule pour que tout tienne
+        // In Fit mode, we calculate the cell height so that everything fits
         val cellHeightPx = if (isFitMode) {
             (containerHeightPx - gapPx * (rows - 1)) / rows
         } else {
-            cellPx // Carré par défaut en mode scroll
+            cellPx // Default square in scroll mode
         }
         val cellHeightStepPx = cellHeightPx + gapPx
 
@@ -558,7 +558,7 @@ private fun DashboardGrid(
                 val heightDp = with(density) { (cellHeightPx * widget.h + gapPx * (widget.h - 1)).toDp() }
 
                 if (isBeingDragged) {
-                    // Suit le doigt sans lag
+                    // Follows the finger without lag
                     val committedOffsetX = with(density) { (cellStepPx * widget.x).toDp() }
                     val committedOffsetY = with(density) { (cellHeightStepPx * widget.y).toDp() }
                     val rawOffsetX = with(density) { dragState!!.rawOffsetPx.x.toDp() }
@@ -633,7 +633,7 @@ private fun DashboardGrid(
     }
 }
 
-/** Etat partagé du drag en cours, pour que TOUS les widgets puissent réagir (poussée) pendant qu'un seul est déplacé. */
+/** Shared state of the current drag, so that ALL widgets can react (push) while only one is moved. */
 private data class DragUiState(
     val draggedId: String,
     val preview: Map<String, GridEngine.Rect>,
@@ -641,18 +641,18 @@ private data class DragUiState(
 )
 
 /**
- * Superpose au widget une zone de déplacement (tout le corps) et une
- * poignée de redimensionnement (coin bas-droit).
+ * Overlays the widget with a movement area (the whole body) and a
+ * resizing handle (bottom-right corner).
  *
- * Déplacement : à chaque évènement de drag, calcule la cellule visée
- * (snap sur la grille) et le layout complet résultant via
- * GridEngine.resolvePushLayout (les widgets dans le chemin sont poussés
- * plus bas). Ce résultat n'est qu'un aperçu (onMovePreview) tant que le
- * doigt n'est pas relâché ; c'est seulement à onMoveCommit que le
- * ViewModel persiste réellement la disposition.
+ * Movement: at each drag event, calculates the target cell
+ * (snap on the grid) and the resulting full layout via
+ * GridEngine.resolvePushLayout (widgets in the way are pushed
+ * lower). This result is only a preview (onMovePreview) until the
+ * finger is released; it is only at onMoveCommit that the
+ * ViewModel actually persists the layout.
  *
- * Redimensionnement : inchangé par rapport à avant, commit immédiat à
- * chaque étape valide (pas de préview poussée pour le resize).
+ * Resizing: unchanged from before, immediate commit at
+ * each valid step (no pushed preview for resizing).
  */
 @Composable
 private fun EditOverlay(
@@ -759,9 +759,9 @@ private fun EditOverlay(
                 }
         )
 
-        // Suppression : pas de confirmation (coherent avec le reste de
-        // l'app — removePage n'en a pas non plus), un tap suffit. A
-        // reconsiderer si ca s'avere source d'accidents en usage reel.
+        // Deletion: no confirmation (consistent with the rest of the
+        // app — removePage does not have one either), one tap is enough. To
+        // be reconsidered if it proves to be a source of accidents in real use.
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)

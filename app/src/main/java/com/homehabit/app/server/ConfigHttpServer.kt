@@ -18,17 +18,17 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 
 /**
- * Serveur HTTP local permettant d'éditer la config du dashboard depuis
- * n'importe quel navigateur du réseau local (ex: http://<ip-tablette>:8090).
+ * Local HTTP server allowing to edit the dashboard config from
+ * any browser on the local network (e.g., http://<tablet-ip>:8090).
  *
- * Protege par un token simple (voir ConfigRepository.ensureHttpAuthToken)
- * plutot qu'un vrai systeme de comptes — suffisant pour un reseau local,
- * evite qu'un appareil quelconque sur le wifi puisse lire/modifier la
- * config (qui contient desormais le mot de passe Domoticz) ou piloter
- * les widgets sans rien demander. Toujours pas de HTTPS : le token
- * circule en clair sur le reseau local, cohérent avec le niveau de
- * confiance suppose (LAN domestique), mais a revisiter serieusement si
- * l'app doit un jour etre exposee au-dela du LAN.
+ * Protected by a simple token (see ConfigRepository.ensureHttpAuthToken)
+ * rather than a real account system — sufficient for a local network,
+ * prevents any device on the wifi from being able to read/modify the
+ * config (which now contains the Domoticz password) or control
+ * widgets without asking anything. Still no HTTPS: the token
+ * circulates in clear on the local network, consistent with the level of
+ * assumed trust (domestic LAN), but to be seriously revisited if
+ * the app must one day be exposed beyond the LAN.
  */
 class ConfigHttpServer(
     private val repository: ConfigRepository,
@@ -50,11 +50,11 @@ class ConfigHttpServer(
 
             routing {
                 get("/") {
-                    // Le premier chargement de page ne peut pas porter
-                    // d'entete Authorization (navigation navigateur
-                    // classique) : le token doit passer en query param
-                    // ici. Le HTML servi l'embarque ensuite dans son JS
-                    // pour les appels fetch() suivants (voir
+                    // The first page load cannot carry
+                    // an Authorization header (classic browser
+                    // navigation): the token must pass in a query param
+                    // here. The served HTML then embeds it in its JS
+                    // for subsequent fetch() calls (see
                     // configEditorHtml).
                     if (!isAuthorized(call)) {
                         call.respondText(
@@ -75,7 +75,7 @@ class ConfigHttpServer(
                         call.respondText("Non autorise", ContentType.Text.Plain, HttpStatusCode.Unauthorized)
                         return@get
                     }
-                    // Force la desactivation du cache pour eviter de voir une ancienne config
+                    // Force cache deactivation to avoid seeing an old config
                     call.response.headers.append("Cache-Control", "no-cache, no-store, must-revalidate")
                     call.respondText(
                         repository.serialize(repository.current()),
@@ -109,11 +109,11 @@ class ConfigHttpServer(
     }
 
     /**
-     * Accepte le token soit en query param (?token=...), soit en entete
-     * Authorization: Bearer .... Si aucun token n'est configure (ne
-     * devrait plus arriver depuis ConfigRepository.ensureHttpAuthToken,
-     * mais filet de securite au cas ou), refuse tout par defaut plutot
-     * que d'ouvrir l'acces en grand.
+     * Accepts the token either in a query param (?token=...), or in an
+     * Authorization: Bearer ... header. If no token is configured (should
+     * no longer happen since ConfigRepository.ensureHttpAuthToken,
+     * but safeguard just in case), refuses everything by default rather
+     * than opening access wide.
      */
     private fun isAuthorized(call: ApplicationCall): Boolean {
         val expected = repository.current().settings.httpAuthToken

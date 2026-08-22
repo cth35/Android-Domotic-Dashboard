@@ -25,9 +25,9 @@ import com.homehabit.app.ui.theme.TextPrimary
 import com.homehabit.app.ui.theme.TextSecondary
 
 /**
- * Un onglet par page. Tap = switch (anime le pager). Appui long en mode
- * edition = ouvre PageManageDialog (renommer/supprimer). Onglet "+"
- * visible uniquement en mode edition pour ajouter une page.
+ * One tab per page. Tap = switch (animates the pager). Long press in
+ * edit mode = opens PageManageDialog (rename/delete). "+"
+ * tab visible only in edit mode to add a page.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

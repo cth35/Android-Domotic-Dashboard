@@ -34,18 +34,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Mode plein ecran (Immersive Mode)
+        // Full screen mode (Immersive Mode)
         hideSystemUI()
 
-        // Exigence "toujours allumé" : usage type ecran mural.
+        // "Always on" requirement: wall screen type usage.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Rallumage par-dessus l'ecran verrouille (utilise par
-        // ScreenPowerController.performScreenOn apres une extinction
-        // reelle planifiee). Les attributs XML showWhenLocked/turnScreenOn
-        // du manifest ne s'appliquent qu'a partir de l'API 27 : ces flags
-        // fenetre couvrent aussi les versions plus anciennes (minSdk 23),
-        // au prix d'une API depreciee mais toujours fonctionnelle.
+        // Turning back on over the locked screen (used by
+        // ScreenPowerController.performScreenOn after a planned
+        // actual shutdown). The XML attributes showWhenLocked/turnScreenOn
+        // from the manifest only apply from API 27 onwards: these window
+        // flags also cover older versions (minSdk 23),
+        // at the cost of a deprecated but still functional API.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
             @Suppress("DEPRECATION")
             window.addFlags(
