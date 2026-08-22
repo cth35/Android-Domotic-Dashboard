@@ -22,8 +22,11 @@ widgets, dark theme by default, screen kept always on.
     stay up to date for any recent version (2026.x included). The write
     commands (`switchlight`, `setsetpoint`) already used the correct format
     from the start.
-  - `DomoticzRepository.kt` — periodic polling (5s by default) of widgets
-    whose `source.provider = "domoticz"`, mapped to `WidgetLiveState`.
+  - `DomoticzRepository.kt` — device state now comes from a real-time
+    WebSocket push channel rather than periodic polling; only SCENE
+    widgets still use a 5s REST poll (`getscenes`). See the dedicated
+    "Real-time device updates via Domoticz WebSocket" section below for
+    the full picture.
   - `DomoticzConfig.kt` — host/port/credentials, derived from `AppSettings`
     (persisted, editable from the settings screen — see dedicated section
     below). Default values `192.168.1.10:8080` unless changed.
@@ -67,6 +70,123 @@ because Domoticz typically runs over plain HTTP on the local network
    `assets/dashboard_config.json` with the real idx of your devices (visible
    in Domoticz > Setup > Devices), or use the "+" button in edit mode to
    auto-discover them.
+
+## Real-time device updates via Domoticz WebSocket
+
+Domoticz devices (every widget type except SCENE) are no longer refreshed
+by periodic REST polling. Instead, the app connects to Domoticz's push
+channel and applies updates as they happen, falling back to a bulk REST
+fetch only at startup, on reconnect, and whenever the widget list changes.
+This trades a small window of possible staleness (see "Known limitations"
+below) for near-instant UI updates and a lot less network/CPU load than a
+5s poll loop.
+
+### Client (`data/domoticz/DomoticzWebSocketClient.kt`)
+
+- Connects to `ws(s)://<host>:<port>/json` — same host/port as the REST
+  API, Domoticz multiplexes both on the same listener.
+- Announces the `Sec-WebSocket-Protocol: domoticz` subprotocol, hardcoded
+  on the Domoticz server side (`#define websocket_protocol "domoticz"` in
+  its `cWebem.cpp`).
+- Sends HTTP Basic auth (if configured) in the initial handshake request —
+  Domoticz rejects the upgrade otherwise.
+- Uses plain OkHttp (`com.squareup.okhttp3:okhttp:4.12.0`) rather than
+  Ktor's websocket plugin, so as not to touch the Android engine that
+  `DomoticzClient` (REST) already relies on.
+- `pingInterval(30s)` on the underlying `OkHttpClient`: keeps the
+  connection alive across routers/NAT, and — just as importantly — lets
+  OkHttp detect a silently-dead connection (no TCP reset, e.g. an expired
+  NAT mapping) within roughly one ping interval, triggering `onFailure`
+  and therefore a reconnect.
+- Automatic reconnection with exponential backoff (1s → 2s → 5s → 10s →
+  capped at 30s), reset to 1s as soon as a connection succeeds.
+- Emits a `DomoticzWsEvent` sealed class: `Connected`, `Disconnected`,
+  `Failed`, `DeviceUpdate(device)`. Every raw message is logged at debug
+  level (tag `DomoticzWebSocket`) before parsing, to make it possible to
+  inspect the actual payload shape on a given Domoticz version via
+  Logcat.
+
+**Known limitation — message format is not officially documented.**
+Domoticz doesn't publish a schema for what it pushes on this channel; the
+current parsing (`DomoticzDeviceDto`, shared with the REST client) is a
+best-effort guess based on the official web client and the Dashticz
+project. `kotlinx.serialization` is configured with `ignoreUnknownKeys =
+true` and graceful per-field fallbacks, so a mismatch degrades silently
+rather than crashing — but that also means it can go unnoticed without
+checking the raw Logcat output on your actual server version.
+
+### Repository (`data/domoticz/DomoticzRepository.kt`)
+
+- `fetchInitialDeviceStates(widgets)` — one bulk REST call
+  (`getUsedDevices`, plus a per-widget fallback for "unused" devices),
+  used to seed the initial state. The websocket only pushes on *change*,
+  so without this call a widget would stay empty until its first change
+  after the app opens.
+- `observeLiveUpdates(widgets)` — wraps `DomoticzWebSocketClient`, filters
+  incoming device updates against the current widget list (matched by
+  `idx`), and maps them through the same `mapDeviceToState` /
+  `parseDomoticzLastUpdate` helpers already used by the REST path (a
+  single source of mapping truth). Emits `DomoticzLiveEvent.StateUpdate`
+  (a partial map — one or more widgets sharing the same `idx`) and
+  `DomoticzLiveEvent.ConnectionChanged` (surfaced to the UI, see below).
+- `observeScenePolling(widgets)` — the only remaining periodic REST poll
+  (5s, `getscenes`). Kept separate because nothing confirms scenes and
+  groups are pushed over the same websocket channel — it's a distinct
+  Domoticz REST resource from `getdevices`.
+
+### ViewModel orchestration (`ui/dashboard/DashboardViewModel.kt`)
+
+Three independent, restartable coroutine jobs, all recreated by
+`updateDomoticzSettings()` whenever the server config changes:
+
+- `startDomoticzInitialFetch()` — the one-shot bulk fetch above, re-run
+  whenever the Domoticz widget list changes (widget added/removed, or
+  first load).
+- `startDomoticzPolling()` — scenes only, unchanged 5s REST loop.
+- `startDomoticzLiveUpdates()` — the websocket stream. Tracks the
+  connection transition: on a *reconnect* (not the very first connection,
+  already covered by the initial fetch above), it re-runs
+  `fetchInitialDeviceStates()` to catch up on anything that changed while
+  disconnected (e.g. a light toggled by a wall switch while Domoticz was
+  restarting for maintenance) — otherwise that widget would stay frozen
+  on its last known value indefinitely.
+- All three funnel into a single `mergeDomoticzStates()` helper: an
+  incoming state only replaces the current one if it's newer (2s
+  clock-skew margin). This applies uniformly to REST polling, the initial
+  fetch, the websocket delta, *and* the reconnect resync — so a resync
+  that completes right after a user-triggered optimistic update (e.g.
+  `toggleLight`) can't overwrite it with a slightly older REST snapshot.
+
+### Connection status badge (`ui/dashboard/DashboardScreen.kt` → `ConnectionStatusBadge`)
+
+- Small red pill, top-left corner, "Domoticz offline" with a `CloudOff`
+  icon, bound to `DashboardViewModel.isDomoticzLiveConnected`.
+- Unlike the edit/settings FABs (hidden by default, revealed on touch),
+  this badge stays visible as long as the websocket is down — appropriate
+  for a wall display nobody actively touches to "check" anything.
+- 8s grace period before appearing, to avoid a flash on app startup while
+  the very first handshake is still in progress.
+- Reflects the websocket connection only, not `observeScenePolling()`'s
+  REST failures (currently retried silently, not surfaced) — a
+  non-issue if you don't use SCENE widgets, otherwise a scene-specific
+  REST outage wouldn't show up in this badge.
+- Deliberately **not** the same signal as the per-widget "last updated"
+  badge (see below): a widget can show "3h ago" simply because it hasn't
+  changed, which looks identical to a real outage. Only this connection
+  badge distinguishes "nothing happened" from "I can't reach the server".
+
+### Known limitations / not yet validated on a real device
+
+- **No test session yet covering a real, extended Domoticz outage** (a
+  multi-day run including an actual server restart). The reconnect/resync
+  logic above is code-reviewed, not field-tested.
+- **No distinction between a transient network failure and a permanent
+  one** (e.g. wrong credentials) — both trigger the same backoff/retry
+  loop and the same "offline" badge, with no indication of *why*.
+- Android's Doze/background restrictions are not a concern for an
+  always-on, always-foreground wall tablet (the primary use case here),
+  but would need revisiting if the app is ever run on a device that
+  leaves the foreground for long periods.
 
 ## Multi-dashboard (swipeable pages)
 
@@ -208,8 +328,9 @@ startup.
     project but was never called — a half-built feature, now wired up.
     Open/close remain optimistically updated (0%/100%); **stop
     intentionally has no optimistic update** — it's impossible to know the
-    exact position where the shutter stops, the next poll (5s) brings back
-    the real value. Tap zone deliberately small (20dp) to fit 3 buttons on
+    exact position where the shutter stops, the real value comes back via
+    the Domoticz WebSocket push once the server reports it (see "Real-time
+    device updates via Domoticz WebSocket" above). Tap zone deliberately small (20dp) to fit 3 buttons on
     a 1×1 widget — needs to be validated by touch on a real screen, more
     comfortable on a widget resized to 2×1.
   - **`"toggle"`**: tapping the whole widget toggles open/closed based on
@@ -528,6 +649,12 @@ the app without recompiling it. That's no longer the case.
 
 - Android-Iconics / FontAwesome integration (dependencies commented out in
   `app/build.gradle.kts`)
+- Distinguishing a transient WebSocket failure from a permanent one (e.g.
+  wrong credentials) — see "Real-time device updates via Domoticz
+  WebSocket" above.
+- Surfacing `observeScenePolling()`'s REST failures in the connection
+  badge (currently retried silently) — not needed if you don't use SCENE
+  widgets.
 
 ## Drag & drop repositioning (cascading rearrangement)
 
@@ -722,6 +849,11 @@ device — this is an accepted best-effort, not a guarantee.
 - The badge refreshes itself every 30s (`LaunchedEffect` local to
   `LastUpdateBadge`) so the relative text stays accurate without waiting
   for a new business event.
+- **Not a connectivity indicator**: this badge only reflects when the
+  *value itself* last changed, so a widget untouched for hours looks
+  identical whether everything is fine or the server is unreachable. See
+  the `ConnectionStatusBadge` described in "Real-time device updates via
+  Domoticz WebSocket" above for that distinction.
 
 ## Opening the project
 
@@ -756,3 +888,6 @@ Domoticz (read + write + discovery), weather (current + 7-day forecast),
 camera (snapshot + RTSP), configurable dashboard (JSON + authenticated
 HTTP server + native settings screen), multi-page with swipe, drag &
 resize with cascading rearrangement, consistent theme, and night mode.
+Domoticz device state is now driven by a real-time WebSocket channel
+(automatic reconnect + resync, connection status badge) instead of
+periodic polling — see "Real-time device updates via Domoticz WebSocket".

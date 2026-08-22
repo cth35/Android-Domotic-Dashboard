@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
@@ -36,6 +37,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -69,6 +71,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     val availableDevices by viewModel.availableDevices.collectAsState()
     val availableScenes by viewModel.availableScenes.collectAsState()
     val isEditMode by viewModel.isEditMode.collectAsState()
+    val isDomoticzLiveConnected by viewModel.isDomoticzLiveConnected.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -182,6 +185,17 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                 }
             }
         }
+
+        // Badge de connexion Domoticz : contrairement aux FAB ci-dessous
+        // (masques par defaut, revelees seulement au toucher), celui-ci
+        // reste visible en permanence tant que le websocket est coupe —
+        // c'est un dashboard mural, personne ne va "toucher l'ecran" pour
+        // decouvrir que le serveur est en panne. N'affiche rien tant que
+        // tout va bien : aucun encombrement visuel en usage normal.
+        ConnectionStatusBadge(
+            isConnected = isDomoticzLiveConnected,
+            modifier = Modifier.align(Alignment.TopStart)
+        )
 
         AnimatedVisibility(
             visible = controlsVisible || isEditMode,
@@ -342,6 +356,66 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
 
     ManageDialogHost(pageIndex = managePageIndex, pages = pages, viewModel = viewModel) {
         managePageIndex = null
+    }
+}
+
+/**
+ * Badge global d'etat de connexion au serveur Domoticz, base sur le
+ * canal websocket temps reel (DashboardViewModel.isDomoticzLiveConnected).
+ * Invisible tant que tout va bien ; apparait des que la connexion est
+ * perdue, avec un delai de grace pour ne pas clignoter au demarrage de
+ * l'app le temps que le tout premier handshake s'etablisse.
+ *
+ * Volontairement independant du polling REST des scenes : ce badge ne
+ * reflete que l'etat du websocket, qui couvre l'essentiel des widgets
+ * (lumieres, volets, capteurs...). Si le serveur est completement injoignable
+ * (ex. coupe pour maintenance), le websocket tombe aussi, donc le badge
+ * s'affiche correctement dans ce cas — c'est le scenario vise.
+ */
+@Composable
+private fun ConnectionStatusBadge(isConnected: Boolean, modifier: Modifier = Modifier) {
+    var showBadge by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isConnected) {
+        if (isConnected) {
+            showBadge = false
+        } else {
+            // Delai de grace : le tout premier handshake au lancement de
+            // l'app prend generalement 1-2s, pas la peine d'alarmer
+            // l'utilisateur pour ca. Au-dela, la coupure est reelle.
+            delay(8_000)
+            showBadge = true
+        }
+    }
+
+    AnimatedVisibility(
+        visible = showBadge,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .padding(16.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(AccentRed.copy(alpha = 0.9f))
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.CloudOff,
+                contentDescription = null,
+                tint = TextPrimary,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "Domoticz hors ligne",
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }
 

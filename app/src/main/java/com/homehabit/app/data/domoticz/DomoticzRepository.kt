@@ -7,89 +7,148 @@ import com.homehabit.app.model.WidgetConfig
 import com.homehabit.app.model.WidgetType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.mapNotNull
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class DomoticzRepository(private val client: DomoticzClient) {
+/**
+ * Evenements consommes par le ViewModel depuis le canal websocket, deja
+ * traduits dans le vocabulaire du dashboard (WidgetStateEntry) plutot
+ * que le DTO Domoticz brut — pour que updateDomoticzSettings() et load()
+ * n'aient qu'un seul type d'evenement a gerer, comme pour le polling.
+ */
+sealed class DomoticzLiveEvent {
+    data class ConnectionChanged(val connected: Boolean) : DomoticzLiveEvent()
+    data class StateUpdate(val states: Map<String, WidgetStateEntry>) : DomoticzLiveEvent()
+}
+
+class DomoticzRepository(
+    private val client: DomoticzClient,
+    private val wsClient: DomoticzWebSocketClient
+) {
 
     /**
-     * Poll en continu les widgets dont la source est "domoticz" et emet
-     * la map complete a chaque cycle. Les widgets non-Domoticz (meteo,
-     * camera) ne sont pas concernes et restent geres ailleurs.
-     *
-     * Les widgets SCENE sont traites a part : Domoticz les expose via
-     * une ressource distincte (getscenes) de celle des devices
-     * (getdevices), donc un seul appel getScenes() par cycle suffit pour
-     * TOUS les widgets scene/groupe, plutot qu'un appel par widget comme
-     * pour les devices.
+     * Poll en continu les widgets SCENE uniquement (getscenes). Les
+     * devices ne sont PLUS polles en continu ici : voir
+     * fetchInitialDeviceStates() (etat initial, un seul appel) et
+     * observeLiveUpdates() (mises a jour temps reel via websocket) —
+     * approche "full websocket" pour les devices. Les scenes/groupes
+     * restent en polling REST pur car rien ne confirme qu'elles sont
+     * poussees sur le canal websocket (ressource Domoticz distincte de
+     * getdevices).
      */
-    fun observeStates(
+    fun observeScenePolling(
         widgets: List<WidgetConfig>,
         pollIntervalMs: Long = 5_000L
     ): Flow<Map<String, WidgetStateEntry>> = flow {
-        val domoticzWidgets = widgets.filter { it.source?.provider == "domoticz" }
-        if (domoticzWidgets.isEmpty()) {
+        val sceneWidgets = widgets.filter {
+            it.source?.provider == "domoticz" && it.widgetType == WidgetType.SCENE
+        }
+        if (sceneWidgets.isEmpty()) {
             emit(emptyMap())
             return@flow
         }
 
-        val sceneWidgets = domoticzWidgets.filter { it.widgetType == WidgetType.SCENE }
-        val deviceWidgets = domoticzWidgets.filter { it.widgetType != WidgetType.SCENE }
-
-        val lastStates = mutableMapOf<String, WidgetStateEntry>()
-
         while (true) {
             try {
-                var anyUpdate = false
-
-                if (deviceWidgets.isNotEmpty()) {
-                    val allDevices = client.getUsedDevices()
-                    for (widget in deviceWidgets) {
-                        val idx = extractIdx(widget) ?: continue
-                        // On cherche dans le bulk, sinon fallback individuel (pour les devices "unused")
-                        val device = allDevices.firstOrNull { it.idx == idx } ?: client.getDevice(idx)
-                        
-                        if (device != null) {
-                            lastStates[widget.id] = WidgetStateEntry(
-                                state = mapDeviceToState(widget.widgetType, device),
-                                lastUpdate = parseDomoticzLastUpdate(device.LastUpdate),
-                                fallbackName = device.Name
-                            )
-                            anyUpdate = true
-                        }
-                    }
-                }
-
-                if (sceneWidgets.isNotEmpty()) {
-                    val scenes = client.getScenes()
-                    for (widget in sceneWidgets) {
-                        val idx = extractIdx(widget) ?: continue
-                        val scene = scenes.firstOrNull { it.idx == idx }
-                        if (scene != null) {
-                            lastStates[widget.id] = WidgetStateEntry(
-                                state = WidgetLiveState.Scene(
-                                    isGroup = scene.Type.equals("Group", ignoreCase = true),
-                                    isOn = scene.Status.equals("On", ignoreCase = true)
-                                ),
-                                lastUpdate = parseDomoticzLastUpdate(scene.LastUpdate),
-                                fallbackName = scene.Name
-                            )
-                            anyUpdate = true
-                        }
-                    }
-                }
-
-                if (anyUpdate || lastStates.isNotEmpty()) {
-                    emit(lastStates.toMap())
-                }
+                val scenes = client.getScenes()
+                val states = sceneWidgets.mapNotNull { widget ->
+                    val idx = extractIdx(widget) ?: return@mapNotNull null
+                    val scene = scenes.firstOrNull { it.idx == idx } ?: return@mapNotNull null
+                    widget.id to WidgetStateEntry(
+                        state = WidgetLiveState.Scene(
+                            isGroup = scene.Type.equals("Group", ignoreCase = true),
+                            isOn = scene.Status.equals("On", ignoreCase = true)
+                        ),
+                        lastUpdate = parseDomoticzLastUpdate(scene.LastUpdate),
+                        fallbackName = scene.Name
+                    )
+                }.toMap()
+                if (states.isNotEmpty()) emit(states)
             } catch (e: Exception) {
-                // En cas d'erreur (timeout, reseau), on garde les derniers etats
-                // connus et on retentera au prochain cycle sans tuer le Flow.
+                // Meme logique que l'ancien observeStates() : on garde les
+                // derniers etats connus et on retentera au prochain cycle.
             }
-            
+
             val jitter = (0..500).random().toLong()
             delay(pollIntervalMs + jitter)
+        }
+    }
+
+    /**
+     * Etat initial des widgets devices (hors scenes), en UN SEUL appel
+     * bulk. A appeler une fois au demarrage et a chaque changement de la
+     * liste de widgets — le websocket (observeLiveUpdates) prend ensuite
+     * le relais pour toute mise a jour ulterieure, sans nouveau poll
+     * periodique. Necessaire car le websocket ne pousse que sur
+     * CHANGEMENT : sans ce fetch initial, un widget resterait vide tant
+     * qu'aucun changement physique n'est survenu depuis l'ouverture de
+     * l'app.
+     */
+    suspend fun fetchInitialDeviceStates(widgets: List<WidgetConfig>): Map<String, WidgetStateEntry> {
+        val deviceWidgets = widgets.filter {
+            it.source?.provider == "domoticz" && it.widgetType != WidgetType.SCENE
+        }
+        if (deviceWidgets.isEmpty()) return emptyMap()
+
+        return runCatching {
+            val allDevices = client.getUsedDevices()
+            deviceWidgets.mapNotNull { widget ->
+                val idx = extractIdx(widget) ?: return@mapNotNull null
+                // Fallback individuel pour les devices "unused" absents du bulk.
+                val device = allDevices.firstOrNull { it.idx == idx } ?: client.getDevice(idx)
+                device ?: return@mapNotNull null
+                widget.id to WidgetStateEntry(
+                    state = mapDeviceToState(widget.widgetType, device),
+                    lastUpdate = parseDomoticzLastUpdate(device.LastUpdate),
+                    fallbackName = device.Name
+                )
+            }.toMap()
+        }.getOrDefault(emptyMap())
+    }
+
+    /**
+     * Flux temps reel base sur le websocket Domoticz (/json). Reutilise
+     * mapDeviceToState/parseDomoticzLastUpdate — memes regles de mapping
+     * que le polling REST, seule la source du DTO change.
+     *
+     * Emet un evenement par device modifie (pas l'etat complet comme
+     * observeStates()) : au ViewModel de fusionner ces deltas avec l'etat
+     * deja connu. Les widgets SCENE ne sont PAS couverts ici : rien ne
+     * confirme que Domoticz pousse les changements de scene/groupe sur ce
+     * canal (ressource distincte de getdevices, cf. getScenes) — a
+     * verifier sur le terrain. Ils restent geres par observeStates().
+     *
+     * Un seul idx peut en theorie alimenter plusieurs widgets (rare mais
+     * le JSON de config le permet) : tous sont mis a jour dans ce cas.
+     */
+    fun observeLiveUpdates(widgets: List<WidgetConfig>): Flow<DomoticzLiveEvent> {
+        val deviceWidgets = widgets.filter {
+            it.source?.provider == "domoticz" && it.widgetType != WidgetType.SCENE
+        }
+        if (deviceWidgets.isEmpty()) return emptyFlow()
+
+        return wsClient.observeEvents().mapNotNull { event ->
+            when (event) {
+                is DomoticzWsEvent.Connected -> DomoticzLiveEvent.ConnectionChanged(true)
+                is DomoticzWsEvent.Disconnected -> DomoticzLiveEvent.ConnectionChanged(false)
+                is DomoticzWsEvent.Failed -> DomoticzLiveEvent.ConnectionChanged(false)
+                is DomoticzWsEvent.DeviceUpdate -> {
+                    val matching = deviceWidgets.filter { extractIdx(it) == event.device.idx }
+                    if (matching.isEmpty()) return@mapNotNull null
+
+                    val states = matching.associate { widget ->
+                        widget.id to WidgetStateEntry(
+                            state = mapDeviceToState(widget.widgetType, event.device),
+                            lastUpdate = parseDomoticzLastUpdate(event.device.LastUpdate),
+                            fallbackName = event.device.Name
+                        )
+                    }
+                    DomoticzLiveEvent.StateUpdate(states)
+                }
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 package com.homehabit.app.ui.dashboard
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.homehabit.app.data.ConfigRepository
@@ -10,7 +11,9 @@ import com.homehabit.app.data.camera.CameraRepository
 import com.homehabit.app.data.domoticz.DiscoveredDomoticzDevice
 import com.homehabit.app.data.domoticz.DiscoveredDomoticzScene
 import com.homehabit.app.data.domoticz.DomoticzClient
+import com.homehabit.app.data.domoticz.DomoticzLiveEvent
 import com.homehabit.app.data.domoticz.DomoticzRepository
+import com.homehabit.app.data.domoticz.DomoticzWebSocketClient
 import com.homehabit.app.data.domoticz.toDomoticzConfig
 import com.homehabit.app.data.weather.OpenMeteoClient
 import com.homehabit.app.data.weather.WeatherRepository
@@ -31,6 +34,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 class DashboardViewModel(
@@ -38,10 +42,14 @@ class DashboardViewModel(
 ) : ViewModel() {
 
     // Remplacables a chaud : quand les reglages Domoticz changent
-    // (updateDomoticzSettings), l'ancien client est ferme et un nouveau
-    // est cree avec la nouvelle config, sans redemarrer toute l'app.
+    // (updateDomoticzSettings), les anciens clients sont fermes et de
+    // nouveaux sont crees avec la nouvelle config, sans redemarrer toute
+    // l'app. domoticzWsClient est le canal websocket temps reel,
+    // complementaire du polling REST (domoticzClient) garde comme filet
+    // de securite — voir startDomoticzLiveUpdates().
     private var domoticzClient = DomoticzClient(repository.current().settings.toDomoticzConfig())
-    private var domoticzRepository = DomoticzRepository(domoticzClient)
+    private var domoticzWsClient = DomoticzWebSocketClient(repository.current().settings.toDomoticzConfig())
+    private var domoticzRepository = DomoticzRepository(domoticzClient, domoticzWsClient)
 
     private val weatherClient = OpenMeteoClient()
     private val weatherRepository = WeatherRepository(weatherClient)
@@ -93,10 +101,21 @@ class DashboardViewModel(
     val sparklines: StateFlow<Map<String, List<Float>>> = _sparklines.asStateFlow()
 
     private var domoticzPollingJob: Job? = null
+    private var domoticzInitialFetchJob: Job? = null
+    private var domoticzLiveJob: Job? = null
+
+    // Etat du canal websocket, expose pour un futur indicateur visuel
+    // (ex. petit point dans SettingsDialog) et pour le debug sur device
+    // reel. N'affecte pas le polling REST, qui continue de tourner en
+    // parallele quoi qu'il arrive (voir startDomoticzLiveUpdates).
+    private val _isDomoticzLiveConnected = MutableStateFlow(false)
+    val isDomoticzLiveConnected: StateFlow<Boolean> = _isDomoticzLiveConnected.asStateFlow()
 
     fun load() {
         startWeatherPolling()
+        startDomoticzInitialFetch()
         startDomoticzPolling()
+        startDomoticzLiveUpdates()
         startCameraPolling()
         startSparklinePolling()
     }
@@ -135,9 +154,39 @@ class DashboardViewModel(
     }
 
     /**
-     * Redemarrable : updateDomoticzSettings() annule ce job et en relance
-     * un nouveau avec le domoticzRepository fraichement recree, pour que
-     * le changement de serveur (host/port/identifiants) prenne effet
+     * Fusionne un lot d'etats Domoticz fraichement recus (poll scenes,
+     * fetch initial, resync de reconnexion, ou delta websocket) dans
+     * domoticzStates, publie le resultat, et retourne. Regle unique
+     * partagee par les quatre call sites ci-dessous : on ne remplace un
+     * etat local que si l'etat entrant est plus recent, avec une marge de
+     * 2 secondes pour absorber un eventuel decalage d'horloge entre la
+     * tablette et le serveur Domoticz.
+     *
+     * Important : meme le resync de reconnexion passe par cette regle
+     * desormais (pas d'ecrasement brut) — un resync REST qui termine
+     * juste apres une mise a jour optimiste locale (ex. toggleLight) ne
+     * doit pas ecraser une action plus recente que l'etat qu'il rapporte.
+     */
+    private fun mergeDomoticzStates(incoming: Map<String, WidgetStateEntry>) {
+        if (incoming.isEmpty()) return
+        val merged = domoticzStates.toMutableMap()
+        incoming.forEach { (id, entry) ->
+            val existing = merged[id]
+            if (existing == null || entry.lastUpdate > (existing.lastUpdate - 2000)) {
+                merged[id] = entry
+            }
+        }
+        domoticzStates = merged
+        publishMergedStates()
+    }
+
+    /**
+     * Poll continu des widgets SCENE uniquement (getscenes) — les devices
+     * ne sont plus polles ici, voir startDomoticzInitialFetch() (etat de
+     * depart) et startDomoticzLiveUpdates() (websocket, seule source de
+     * mise a jour ensuite). Redemarrable : updateDomoticzSettings()
+     * annule ce job et en relance un nouveau avec le domoticzRepository
+     * fraichement recree, pour que le changement de serveur prenne effet
      * immediatement sans redemarrer toute l'app.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -147,38 +196,120 @@ class DashboardViewModel(
             repository.configFlow
                 .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "domoticz" } }
                 .distinctUntilChanged()
-                .flatMapLatest { widgets -> domoticzRepository.observeStates(widgets) }
-                .collect { states ->
-                    // Fusion intelligente : on ne remplace un etat local que si l'etat 
-                    // renvoye par le serveur est plus recent. On ajoute une marge de 
-                    // 2 secondes pour compenser un eventuel decalage d'horloge entre 
-                    // le telephone et le serveur Domoticz.
-                    val merged = domoticzStates.toMutableMap()
-                    states.forEach { (id, incoming) ->
-                        val existing = merged[id]
-                        if (existing == null || incoming.lastUpdate > (existing.lastUpdate - 2000)) {
-                            merged[id] = incoming
+                .flatMapLatest { widgets -> domoticzRepository.observeScenePolling(widgets) }
+                .collect { states -> mergeDomoticzStates(states) }
+        }
+    }
+
+    /**
+     * Etat de depart des widgets devices (hors scenes) : un seul appel
+     * bulk a chaque fois que la liste de widgets Domoticz change (ajout,
+     * suppression, ou premier chargement). Ensuite, plus aucun appel
+     * REST periodique sur les devices — le websocket (voir
+     * startDomoticzLiveUpdates) est la SEULE source de mise a jour.
+     *
+     * Compromis assume ("full websocket") : si le canal websocket perd
+     * silencieusement un evenement sans que la connexion se coupe
+     * franchement (cas rare mais possible), le widget concerne reste
+     * affiche avec sa derniere valeur connue jusqu'au prochain changement
+     * de widgets ou redemarrage de l'app — il n'y a plus de resynchro
+     * REST periodique pour rattraper ce genre de decalage. A surveiller
+     * en usage reel ; si ca s'avere genant, la parade la plus simple est
+     * un appel periodique tres espace (ex. toutes les 5-10min) plutot que
+     * de revenir a un polling 5s.
+     */
+    private fun startDomoticzInitialFetch() {
+        domoticzInitialFetchJob?.cancel()
+        domoticzInitialFetchJob = viewModelScope.launch {
+            repository.configFlow
+                .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "domoticz" } }
+                .distinctUntilChanged()
+                .collect { widgets ->
+                    mergeDomoticzStates(domoticzRepository.fetchInitialDeviceStates(widgets))
+                }
+        }
+    }
+
+    // Derniere liste de widgets Domoticz connue, mise a jour par
+    // startDomoticzLiveUpdates() a chaque changement de config. Sert au
+    // resync declenche sur reconnexion (voir plus bas) : le websocket ne
+    // fournit pas la liste de widgets, seulement l'idx qui vient de
+    // changer, donc il faut la garder sous la main pour pouvoir relancer
+    // un fetchInitialDeviceStates() cible.
+    private var currentDomoticzWidgets: List<WidgetConfig> = emptyList()
+
+    /**
+     * Canal websocket temps reel (/json) : SEULE source de mise a jour
+     * pour les devices Domoticz (voir startDomoticzInitialFetch pour
+     * l'etat de depart). Reconnexion/backoff geres dans
+     * DomoticzWebSocketClient.
+     *
+     * A la RECONNEXION (pas la toute premiere connexion, deja couverte
+     * par startDomoticzInitialFetch), on relance un fetch complet des
+     * devices pour rattraper tout ce qui a pu changer physiquement
+     * pendant la coupure (ex. Domoticz redemarre pour maintenance,
+     * quelqu'un actionne un interrupteur pendant ce temps) — sans ca,
+     * ces widgets resteraient figes sur leur derniere valeur connue
+     * jusqu'a leur prochain changement, potentiellement jamais.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun startDomoticzLiveUpdates() {
+        domoticzLiveJob?.cancel()
+        // Suppose "deja connecte" au demarrage pour ne pas declencher un
+        // resync redondant sur la toute premiere connexion (deja geree
+        // par startDomoticzInitialFetch). Ne redevient pertinent qu'apres
+        // une vraie coupure suivie d'une reconnexion.
+        var wasConnected = true
+
+        domoticzLiveJob = viewModelScope.launch {
+            repository.configFlow
+                .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "domoticz" } }
+                .distinctUntilChanged()
+                .onEach { widgets -> currentDomoticzWidgets = widgets }
+                .flatMapLatest { widgets -> domoticzRepository.observeLiveUpdates(widgets) }
+                .collect { event ->
+                    when (event) {
+                        is DomoticzLiveEvent.ConnectionChanged -> {
+                            val justReconnected = event.connected && !wasConnected
+                            wasConnected = event.connected
+                            _isDomoticzLiveConnected.value = event.connected
+
+                            if (justReconnected) {
+                                Log.i(
+                                    "DashboardViewModel",
+                                    "Websocket reconnecte, resync des devices en cours"
+                                )
+                                mergeDomoticzStates(
+                                    domoticzRepository.fetchInitialDeviceStates(currentDomoticzWidgets)
+                                )
+                            }
                         }
+                        is DomoticzLiveEvent.StateUpdate -> mergeDomoticzStates(event.states)
                     }
-                    domoticzStates = merged
-                    publishMergedStates()
                 }
         }
     }
 
     /**
-     * Persiste les nouveaux reglages Domoticz, recree le client HTTP
-     * (l'ancien est explicitement ferme pour ne pas fuiter la connexion)
-     * et relance le polling avec la nouvelle configuration.
+     * Persiste les nouveaux reglages Domoticz, recree les clients HTTP et
+     * websocket (les anciens sont explicitement fermes pour ne pas fuiter
+     * de connexion) et relance polling + canal temps reel avec la
+     * nouvelle configuration.
      */
     fun updateDomoticzSettings(settings: AppSettings) {
         val current = repository.current()
         repository.updateConfig(current.copy(settings = settings))
 
         domoticzClient.close()
-        domoticzClient = DomoticzClient(settings.toDomoticzConfig())
-        domoticzRepository = DomoticzRepository(domoticzClient)
+        domoticzWsClient.close()
+        val newConfig = settings.toDomoticzConfig()
+        domoticzClient = DomoticzClient(newConfig)
+        domoticzWsClient = DomoticzWebSocketClient(newConfig)
+        domoticzRepository = DomoticzRepository(domoticzClient, domoticzWsClient)
+        _isDomoticzLiveConnected.value = false
+        startDomoticzInitialFetch()
         startDomoticzPolling()
+        startDomoticzLiveUpdates()
     }
 
     /**
@@ -589,6 +720,7 @@ class DashboardViewModel(
     override fun onCleared() {
         super.onCleared()
         domoticzClient.close()
+        domoticzWsClient.close()
         weatherClient.close()
     }
 }

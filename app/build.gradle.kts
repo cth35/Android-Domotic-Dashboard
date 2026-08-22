@@ -61,6 +61,11 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
     implementation("io.ktor:ktor-client-auth:2.3.12")
 
+    // Canal websocket temps reel Domoticz (/json) : OkHttp direct plutot
+    // que le plugin websocket de Ktor, pour ne pas toucher au moteur
+    // Android existant de DomoticzClient (REST) qui fonctionne deja.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // Serveur HTTP embarqué (edition de la config depuis un navigateur)
     implementation("io.ktor:ktor-server-core:2.3.12")
     implementation("io.ktor:ktor-server-cio:2.3.12")
