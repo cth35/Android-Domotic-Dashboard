@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.WbIncandescent
 import androidx.compose.material3.Icon
@@ -515,12 +516,17 @@ private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
 @Composable
 private fun ThermostatContent(state: WidgetLiveState.Thermostat?, sparkline: List<Float>?) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = state?.let { "${it.temperature}".replace(".", ",") + "°" } ?: "--",
-            color = TextPrimary,
-            fontSize = 48.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = state?.let { "${it.temperature}".replace(".", ",") + "°" } ?: "--",
+                color = TextPrimary,
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Bold
+            )
+            state?.trend?.let {
+                TrendArrow(it, Modifier.padding(start = 4.dp))
+            }
+        }
         if (sparkline != null && sparkline.size >= 2) {
             Spacer(Modifier.height(2.dp))
             Sparkline(
@@ -618,14 +624,19 @@ private fun SensorContent(state: WidgetLiveState.Sensor?, sparkline: List<Float>
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value.replace(".", ",") + (if (isTemp) "°" else ""),
-            color = TextPrimary,
-            fontSize = 48.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Visible
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = value.replace(".", ",") + (if (isTemp) "°" else ""),
+                color = TextPrimary,
+                fontSize = 48.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Visible
+            )
+            state?.trend?.let {
+                TrendArrow(it, Modifier.padding(start = 4.dp))
+            }
+        }
         if (kindUnit.isNotBlank()) {
             Text(
                 text = kindUnit,
@@ -863,4 +874,19 @@ private fun splitValueAndUnit(displayValue: String): Pair<String, String?> {
 @Composable
 private fun WidgetIcon(icon: ImageVector, tint: androidx.compose.ui.graphics.Color) {
     Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+}
+
+@Composable
+private fun TrendArrow(trend: WidgetLiveState.Trend, modifier: Modifier = Modifier) {
+    if (trend == WidgetLiveState.Trend.STABLE) return
+
+    val icon = if (trend == WidgetLiveState.Trend.UP) Icons.AutoMirrored.Filled.TrendingUp else Icons.AutoMirrored.Filled.TrendingDown
+    val color = if (trend == WidgetLiveState.Trend.UP) AccentRed else AccentBlueMuted
+
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = color,
+        modifier = modifier.size(16.dp)
+    )
 }

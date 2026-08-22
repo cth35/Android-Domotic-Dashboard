@@ -263,6 +263,13 @@ class DomoticzRepository(
         }.getOrNull() ?: System.currentTimeMillis()
     }
 
+    private fun mapTrend(device: DomoticzDeviceDto): WidgetLiveState.Trend = 
+        when (device.Trend ?: device.trendValue) {
+            1 -> WidgetLiveState.Trend.UP
+            2 -> WidgetLiveState.Trend.DOWN
+            else -> WidgetLiveState.Trend.STABLE
+        }
+
     private fun mapDeviceToState(type: WidgetType, device: DomoticzDeviceDto): WidgetLiveState =
         when (type) {
             WidgetType.LIGHT, WidgetType.DIMMER, WidgetType.COLOR_LIGHT -> {
@@ -289,7 +296,8 @@ class DomoticzRepository(
             }
 
             WidgetType.THERMOSTAT -> WidgetLiveState.Thermostat(
-                temperature = (device.Temp ?: device.SetPoint ?: 0.0).toFloat()
+                temperature = (device.Temp ?: device.SetPoint ?: 0.0).toFloat(),
+                trend = mapTrend(device)
             )
 
             WidgetType.SHUTTER -> WidgetLiveState.Shutter(
@@ -353,7 +361,8 @@ class DomoticzRepository(
         return WidgetLiveState.Sensor(
             displayValue = device.Data ?: "--",
             kind = kind,
-            gaugePercent = gaugePercent
+            gaugePercent = gaugePercent,
+            trend = mapTrend(device)
         )
     }
 }

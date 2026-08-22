@@ -1,11 +1,15 @@
 package com.homehabit.app.data
 
 /**
- * Represents the "live" state of a widget. For now these values are
- * hardcoded; they will be replaced by actual data from the
- * Domoticz client (json.htm) and the weather client (Open-Meteo).
+ * Represents the "live" state of a widget.
  */
 sealed class WidgetLiveState {
+    enum class Trend {
+        STABLE,
+        UP,
+        DOWN
+    }
+
     data class Weather(
         val temperature: Int,
         val condition: String,
@@ -26,7 +30,10 @@ sealed class WidgetLiveState {
         val colorHex: String? = null   // "#RRGGBB", null if no color or not determinable
     ) : WidgetLiveState()
 
-    data class Thermostat(val temperature: Float) : WidgetLiveState()
+    data class Thermostat(
+        val temperature: Float,
+        val trend: Trend = Trend.STABLE
+    ) : WidgetLiveState()
 
     data class Shutter(val percentOpen: Int) : WidgetLiveState()
 
@@ -45,7 +52,8 @@ sealed class WidgetLiveState {
     data class Sensor(
         val displayValue: String,
         val kind: SensorKind = SensorKind.GENERIC,
-        val gaugePercent: Float? = null
+        val gaugePercent: Float? = null,
+        val trend: Trend = Trend.STABLE
     ) : WidgetLiveState()
 
     data class BinarySensor(

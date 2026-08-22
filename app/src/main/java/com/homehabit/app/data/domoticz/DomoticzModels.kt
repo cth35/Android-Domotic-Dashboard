@@ -1,5 +1,6 @@
 package com.homehabit.app.data.domoticz
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -28,6 +29,10 @@ data class DomoticzDeviceDto(
     val Level: Int? = null,
     // Measured temperature (sensors, thermostats)
     val Temp: Double? = null,
+    // Measured trend (0=stable, 1=up, 2=down)
+    val Trend: Int? = null,
+    @SerialName("trend")
+    val trendValue: Int? = null,
     // Configured setpoint (thermostats)
     val SetPoint: Double? = null,
     val Humidity: Double? = null,
