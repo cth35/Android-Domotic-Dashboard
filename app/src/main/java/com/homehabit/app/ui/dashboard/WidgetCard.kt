@@ -88,6 +88,8 @@ fun WidgetCard(
     entry: WidgetStateEntry?,
     modifier: Modifier = Modifier,
     sparkline: List<Float>? = null,
+    sunrise: String? = null,
+    sunset: String? = null,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     onShutterOpen: (() -> Unit)? = null,
@@ -121,7 +123,7 @@ fun WidgetCard(
         if (config.widgetType == WidgetType.CAMERA || config.widgetType == WidgetType.CLOCK) {
             when (config.widgetType) {
                 WidgetType.CAMERA -> CameraContent(config, state as? WidgetLiveState.Camera)
-                WidgetType.CLOCK -> ClockContent()
+                WidgetType.CLOCK -> ClockContent(sunrise, sunset)
                 else -> {}
             }
         } else {
@@ -185,7 +187,7 @@ fun WidgetCard(
 }
 
 @Composable
-private fun ClockContent() {
+private fun ClockContent(sunrise: String? = null, sunset: String? = null) {
     var time by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
 
@@ -222,6 +224,49 @@ private fun ClockContent() {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+
+        if (sunrise != null || sunset != null) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (sunrise != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.WbSunny,
+                            contentDescription = null,
+                            tint = AccentOrange,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = sunrise,
+                            color = TextSecondary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                if (sunset != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.WbTwilight,
+                            contentDescription = null,
+                            tint = AccentOrange,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = sunset,
+                            color = TextSecondary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

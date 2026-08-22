@@ -98,6 +98,16 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     }
 
     val pagerState = rememberPagerState(pageCount = { pages.size.coerceAtLeast(1) })
+    
+    // Extraction du lever/coucher du soleil depuis le premier widget meteo dispo
+    val weatherData = widgetStates.values.mapNotNull { it.state }.firstOrNull { 
+        it is WidgetLiveState.Weather || it is WidgetLiveState.Forecast 
+    }
+    val (sunrise, sunset) = when (weatherData) {
+        is WidgetLiveState.Weather -> weatherData.sunrise to weatherData.sunset
+        is WidgetLiveState.Forecast -> weatherData.days.firstOrNull()?.let { it.sunrise to it.sunset } ?: (null to null)
+        else -> null to null
+    }
     val scope = rememberCoroutineScope()
 
     // Garde le ViewModel informe de la page visible : addWidget() en a
@@ -147,6 +157,8 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                             config = widgetConfig,
                             entry = widgetStates[widgetConfig.id],
                             sparkline = sparklines[widgetConfig.id],
+                            sunrise = sunrise,
+                            sunset = sunset,
                             onClick = when {
                                 isEditMode -> null
                                 widgetConfig.widgetType == WidgetType.WEATHER || widgetConfig.widgetType == WidgetType.FORECAST ->
