@@ -549,13 +549,18 @@ private fun ShutterButtonsContent(
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         val percent = state?.percentOpen ?: 0
+        val textColor = when (percent) {
+            0 -> TextSecondary
+            100 -> AccentGreen
+            else -> AccentOrange
+        }
         Text(
             text = when (percent) {
                 0 -> "FERMÉ"
                 100 -> "OUVERT"
                 else -> "$percent%"
             },
-            color = TextPrimary,
+            color = textColor,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold
         )
@@ -576,18 +581,25 @@ private fun ShutterButtonsContent(
 
 @Composable
 private fun ShutterToggleContent(state: WidgetLiveState.Shutter?) {
-    val isOpen = (state?.percentOpen ?: 0) > 50
+    val percent = state?.percentOpen ?: 0
+    val isOpen = percent > 50
+    val color = when (percent) {
+        0 -> TextSecondary
+        100 -> AccentGreen
+        else -> AccentOrange
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(
             imageVector = if (isOpen) Icons.Filled.Blinds else Icons.Filled.BlindsClosed,
             contentDescription = null,
-            tint = if (isOpen) AccentGreen else TextSecondary,
+            tint = color,
             modifier = Modifier.size(28.dp)
         )
         Text(
-            text = state?.let { "${it.percentOpen}%" } ?: "--",
-            color = TextPrimary,
-            fontSize = 12.sp
+            text = "$percent%",
+            color = color,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
         )
     }
 }
