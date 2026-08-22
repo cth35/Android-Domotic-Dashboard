@@ -277,28 +277,38 @@ private fun BinarySensorContent(state: WidgetLiveState.BinarySensor?) {
     val isContact = state?.isContact == true
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            imageVector = when {
-                isContact && isOn -> Icons.Filled.DoorBack
-                isContact && !isOn -> Icons.Filled.DoorFront
-                isOn -> Icons.Default.DirectionsWalk
-                else -> Icons.Default.DirectionsWalk
-            },
-            contentDescription = null,
-            tint = if (isOn) AccentOrange else TextSecondary,
-            modifier = Modifier.size(28.dp)
-        )
-        Text(
-            text = when {
-                isContact && isOn -> "OUVERT"
-                isContact && !isOn -> "FERMÉ"
-                isOn -> "MOUVEMENT"
-                else -> "AUCUN"
-            },
-            color = if (isOn) TextPrimary else TextSecondary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Box(
+            modifier = Modifier.size(44.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = when {
+                    isContact && isOn -> Icons.Filled.DoorBack
+                    isContact && !isOn -> Icons.Filled.DoorFront
+                    isOn -> Icons.AutoMirrored.Filled.DirectionsWalk
+                    else -> Icons.AutoMirrored.Filled.DirectionsWalk
+                },
+                contentDescription = null,
+                tint = if (isOn) AccentOrange else TextSecondary,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        
+        Spacer(Modifier.height(6.dp))
+        
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = when {
+                    isContact && isOn -> "OUVERT"
+                    isContact && !isOn -> "FERMÉ"
+                    isOn -> "MOUVEMENT"
+                    else -> "AUCUN"
+                },
+                color = if (isOn) TextPrimary else TextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
