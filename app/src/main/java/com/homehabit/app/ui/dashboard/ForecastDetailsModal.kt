@@ -105,7 +105,7 @@ private fun ForecastDayRow(day: ForecastDay) {
         Icon(
             imageVector = iconForWeatherCode(day.weatherCode),
             contentDescription = null,
-            tint = AccentBlueMuted,
+            tint = colorForWeatherCode(day.weatherCode),
             modifier = Modifier.size(32.dp)
         )
         

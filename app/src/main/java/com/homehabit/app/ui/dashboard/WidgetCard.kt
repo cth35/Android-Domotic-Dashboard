@@ -321,11 +321,12 @@ private fun RelativeTimeBadge(lastUpdate: Long) {
 
 @Composable
 private fun WeatherContent(state: WidgetLiveState.Weather?) {
+    val code = state?.weatherCode
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(
-            Icons.Filled.Cloud,
+            iconForWeatherCode(code),
             contentDescription = null,
-            tint = AccentBlueMuted,
+            tint = colorForWeatherCode(code),
             modifier = Modifier.size(24.dp)
         )
         Text(
@@ -386,7 +387,7 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
                 Icon(
                     iconForWeatherCode(day.weatherCode),
                     contentDescription = day.condition,
-                    tint = AccentBlueMuted,
+                    tint = colorForWeatherCode(day.weatherCode),
                     modifier = Modifier.size(32.dp)
                 )
                 Spacer(Modifier.height(4.dp))
@@ -404,12 +405,24 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
 /** Mapping large des codes WMO vers une icone — meme esprit que WeatherCodeMapper mais pour le glyphe plutot que le libelle. */
 internal fun iconForWeatherCode(code: Int?): ImageVector = when (code) {
     0 -> Icons.Filled.WbSunny
-    1, 2, 3 -> Icons.Filled.Cloud
-    45, 48 -> Icons.Filled.Cloud
+    1, 2 -> Icons.Filled.WbCloudy
+    3 -> Icons.Filled.Cloud
+    45, 48 -> Icons.Filled.Grain
     51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> Icons.Filled.WaterDrop
     71, 73, 75, 77, 85, 86 -> Icons.Filled.AcUnit
     95, 96, 99 -> Icons.Filled.Bolt
     else -> Icons.Filled.Cloud
+}
+
+/** Couleurs specifiques selon le type de temps pour une meilleure lisibilite. */
+internal fun colorForWeatherCode(code: Int?): Color = when (code) {
+    0 -> AccentOrange
+    1, 2, 3 -> TextSecondary
+    45, 48 -> TextMuted
+    51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> AccentBlueMuted
+    71, 73, 75, 77, 85, 86 -> TextPrimary
+    95, 96, 99 -> AccentOrange
+    else -> TextSecondary
 }
 
 @Composable

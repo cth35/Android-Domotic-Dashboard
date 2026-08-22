@@ -54,7 +54,7 @@ fun WeatherDetailsModal(
                     Icon(
                         imageVector = iconForWeatherCode(state.weatherCode),
                         contentDescription = null,
-                        tint = AccentBlueMuted,
+                        tint = colorForWeatherCode(state.weatherCode),
                         modifier = Modifier.size(64.dp)
                     )
                     Spacer(Modifier.width(20.dp))
