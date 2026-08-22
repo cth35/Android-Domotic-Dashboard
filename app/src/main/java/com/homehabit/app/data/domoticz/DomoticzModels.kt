@@ -2,6 +2,9 @@ package com.homehabit.app.data.domoticz
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
 
 /**
  * Response from /json.htm?type=devices&rid=... or type=devices&used=true
@@ -30,9 +33,10 @@ data class DomoticzDeviceDto(
     // Measured temperature (sensors, thermostats)
     val Temp: Double? = null,
     // Measured trend (0=stable, 1=up, 2=down)
-    val Trend: Int? = null,
+    val Trend: JsonElement? = null,
     @SerialName("trend")
-    val trendValue: Int? = null,
+    val trendValue: JsonElement? = null,
+    val TempTrend: JsonElement? = null,
     // Configured setpoint (thermostats)
     val SetPoint: Double? = null,
     val Humidity: Double? = null,

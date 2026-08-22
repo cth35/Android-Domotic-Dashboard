@@ -174,7 +174,7 @@ fun WidgetCard(
                             )
                         }
                         WidgetType.LOCK -> LockContent(state as? WidgetLiveState.Lock)
-                        WidgetType.SENSOR -> SensorContent(state as? WidgetLiveState.Sensor, sparkline)
+                        WidgetType.SENSOR -> SensorContent(config, state as? WidgetLiveState.Sensor, sparkline)
                         WidgetType.SCENE -> SceneContent(state as? WidgetLiveState.Scene)
                         WidgetType.BINARY_SENSOR -> BinarySensorContent(state as? WidgetLiveState.BinarySensor)
                         else -> EmptyContent()
@@ -518,7 +518,7 @@ private fun ThermostatContent(state: WidgetLiveState.Thermostat?, sparkline: Lis
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = state?.let { "${it.temperature}".replace(".", ",") + "°" } ?: "--",
+                text = state?.let { String.format(Locale.US, "%.1f", it.temperature).replace(".", ",") + "°" } ?: "--",
                 color = TextPrimary,
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold
@@ -612,38 +612,63 @@ private fun LockContent(state: WidgetLiveState.Lock?) {
 }
 
 @Composable
-private fun SensorContent(state: WidgetLiveState.Sensor?, sparkline: List<Float>?) {
-    val displayValue = state?.displayValue ?: "--"
-    val (value, unit) = splitValueAndUnit(displayValue)
+private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, sparkline: List<Float>?) {
+    val sensorMode = config.source?.sensorMode ?: "temp"
     val isTemp = state?.kind == SensorKind.TEMPERATURE
     
-    val kindUnit = when (state?.kind) {
-        SensorKind.TEMPERATURE -> "" // Displayed via ° next to the value
-        SensorKind.HUMIDITY -> "PERCENT"
-        else -> unit?.uppercase() ?: ""
+    // Determine main display values
+    val (mainValue, mainUnit, showTrend) = when {
+        isTemp && sensorMode == "humidity" && state?.humidityValue != null -> {
+            Triple(String.format(Locale.US, "%.0f", state.humidityValue), "%", false)
+        }
+        isTemp && (sensorMode == "temp" || sensorMode == "both") && state?.tempValue != null -> {
+            Triple(String.format(Locale.US, "%.1f", state.tempValue), "°", true)
+        }
+        else -> {
+            val (v, u) = splitValueAndUnit(state?.displayValue ?: "--")
+            Triple(v, if (isTemp) "°" else u?.uppercase() ?: "", isTemp)
+        }
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = value.replace(".", ",") + (if (isTemp) "°" else ""),
+                text = mainValue.replace(".", ",") + mainUnit,
                 color = TextPrimary,
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Visible
             )
-            state?.trend?.let {
-                TrendArrow(it, Modifier.padding(start = 4.dp))
+            if (showTrend) {
+                state?.trend?.let {
+                    TrendArrow(it, Modifier.padding(start = 4.dp))
+                }
             }
         }
-        if (kindUnit.isNotBlank()) {
+
+        // Secondary display for "both" mode
+        if (isTemp && sensorMode == "both" && state?.humidityValue != null) {
             Text(
-                text = kindUnit,
+                text = "Humidité: ${state.humidityValue.toInt()}%",
                 color = TextSecondary,
-                fontSize = 9.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium
             )
+        } else {
+            val kindUnit = when (state?.kind) {
+                SensorKind.TEMPERATURE -> "" // Displayed via mainUnit or handled above
+                SensorKind.HUMIDITY -> "PERCENT"
+                else -> mainUnit.takeIf { it != "°" } ?: ""
+            }
+            if (kindUnit.isNotBlank()) {
+                Text(
+                    text = kindUnit,
+                    color = TextSecondary,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
         
         if (sparkline != null && sparkline.size >= 2) {

@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -263,12 +265,19 @@ class DomoticzRepository(
         }.getOrNull() ?: System.currentTimeMillis()
     }
 
-    private fun mapTrend(device: DomoticzDeviceDto): WidgetLiveState.Trend = 
-        when (device.Trend ?: device.trendValue) {
-            1 -> WidgetLiveState.Trend.UP
-            2 -> WidgetLiveState.Trend.DOWN
-            else -> WidgetLiveState.Trend.STABLE
+    private fun mapTrend(device: DomoticzDeviceDto): WidgetLiveState.Trend {
+        val raw = device.Trend ?: device.trendValue ?: device.TempTrend
+        val value = raw?.jsonPrimitive?.intOrNull 
+            ?: raw?.jsonPrimitive?.content?.toIntOrNull()
+        
+        return when (value) {
+            2 -> WidgetLiveState.Trend.UP    // TENDENCY_UP
+            3 -> WidgetLiveState.Trend.DOWN  // TENDENCY_DOWN
+            4 -> WidgetLiveState.Trend.UP    // Often used for Fast Rising
+            5 -> WidgetLiveState.Trend.DOWN  // Often used for Fast Falling
+            else -> WidgetLiveState.Trend.STABLE // 0=Unknown, 1=Stable
         }
+    }
 
     private fun mapDeviceToState(type: WidgetType, device: DomoticzDeviceDto): WidgetLiveState =
         when (type) {
@@ -362,7 +371,9 @@ class DomoticzRepository(
             displayValue = device.Data ?: "--",
             kind = kind,
             gaugePercent = gaugePercent,
-            trend = mapTrend(device)
+            trend = mapTrend(device),
+            tempValue = device.Temp,
+            humidityValue = device.Humidity
         )
     }
 }
