@@ -462,7 +462,7 @@ private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
         }
         
         if (isColorLight && isOn) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.clickable { /* Clic géré par le parent via onLongClick */ }
@@ -478,16 +478,23 @@ private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = if (isOn) "ON" else "OFF",
-            color = if (isOn) TextPrimary else TextSecondary,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-        
-        if (isOn && state?.brightness != null) {
-            Text(text = "${state.brightness}%", color = TextSecondary, fontSize = 10.sp)
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = if (isOn) "ON" else "OFF",
+                color = if (isOn) TextPrimary else TextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (isOn && state?.brightness != null) {
+                Text(
+                    text = " (${state.brightness}%)",
+                    color = TextSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Normal,
+                    modifier = Modifier.padding(start = 2.dp)
+                )
+            }
         }
     }
 }
@@ -690,7 +697,7 @@ private fun tintForSensorKind(kind: SensorKind): Color = when (kind) {
 private fun CameraContent(config: WidgetConfig, state: WidgetLiveState.Camera?) {
     val snapshotUrl = config.source?.url?.takeIf { it.isNotBlank() }
     val rtspUrl = config.source?.rtspUrl?.takeIf { it.isNotBlank() }
-    val refreshMs = ((config.source?.refreshSeconds ?: 15).coerceAtLeast(5)) * 1000L
+    val refreshMs = ((config.source?.refreshSeconds ?: 30).coerceAtLeast(5)) * 1000L
     val contentScale = if (config.source?.imageScale == "fit") ContentScale.Fit else ContentScale.Crop
 
     Box(modifier = Modifier.fillMaxSize()) {

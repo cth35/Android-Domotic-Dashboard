@@ -37,9 +37,10 @@ class CameraRepository {
             }
             emit(states)
             
-            // On s'aligne sur le rafraîchissement par défaut (15s). 
-            // Les réglages spécifiques par widget sont gérés côté UI.
-            delay(15_000L)
+            // Rafraîchissement global du badge "Last Update" (par défaut 30s).
+            // Les réglages spécifiques par widget pour l'image elle-même sont 
+            // gérés directement dans le composant CameraContent.
+            delay(30_000L)
         }
     }
 }
