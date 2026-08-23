@@ -315,7 +315,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                 label = widget.label ?: "Camera",
                 rtspUrl = rtspUrl,
                 posterUrl = widget.source.url,
-                useRtspClientNative = config.settings.useRtspClientNative,
+                useRtspClientNative = widget.source.useRtspClientNative ?: config.settings.useRtspClientNative,
                 onDismiss = { cameraModalWidget = null }
             )
         }

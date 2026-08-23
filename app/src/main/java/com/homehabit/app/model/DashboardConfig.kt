@@ -93,5 +93,6 @@ data class WidgetSource(
     val longitude: Double? = null,
     val shutterStyle: String? = null,   // "buttons" (default) or "toggle", SHUTTER widget only
     val imageScale: String? = null,     // "crop" (default) or "fit", CAMERA widget only
-    val sensorMode: String? = null      // "temp" (default), "humidity" or "both"
+    val sensorMode: String? = null,     // "temp" (default), "humidity" or "both"
+    val useRtspClientNative: Boolean? = null // CAMERA widget only, overrides global setting
 )
