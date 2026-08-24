@@ -28,8 +28,11 @@ import com.homehabit.app.model.WidgetType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -111,6 +114,10 @@ class DashboardViewModel(
     private val _isDomoticzLiveConnected = MutableStateFlow(false)
     val isDomoticzLiveConnected: StateFlow<Boolean> = _isDomoticzLiveConnected.asStateFlow()
 
+    // Event emitted when a trigger asks to open a camera modal automatically
+    private val _autoOpenEvent = MutableSharedFlow<WidgetConfig>(extraBufferCapacity = 1)
+    val autoOpenEvent: SharedFlow<WidgetConfig> = _autoOpenEvent.asSharedFlow()
+
     fun load() {
         startWeatherPolling()
         startDomoticzInitialFetch()
@@ -173,11 +180,61 @@ class DashboardViewModel(
         incoming.forEach { (id, entry) ->
             val existing = merged[id]
             if (existing == null || entry.lastUpdate > (existing.lastUpdate - 2000)) {
+                // Check if this update should trigger an auto-open for a camera
+                checkForTrigger(id, existing, entry)
+                
                 merged[id] = entry
             }
         }
         domoticzStates = merged
         publishMergedStates()
+    }
+
+    /**
+     * Checks if a device state change should automatically open a camera modal.
+     * Triggered when a device configured as 'triggerId' in a camera widget
+     * transitions from 'Off' to 'On'.
+     */
+    private fun checkForTrigger(widgetId: String, oldEntry: WidgetStateEntry?, newEntry: WidgetStateEntry) {
+        val currentConfig = repository.current()
+        
+        // Extract idx from ID, supporting both real and virtual widgets
+        val domoticzIdx = if (widgetId.startsWith("virtual_trigger_")) {
+            widgetId.removePrefix("virtual_trigger_")
+        } else {
+            currentConfig.findWidget(widgetId)?.source?.deviceId ?: return
+        }
+        
+        // Find all camera widgets that use this device as a trigger
+        val cameraWidgets = currentConfig.allWidgets().filter { 
+            it.widgetType == WidgetType.CAMERA && it.source?.triggerId == domoticzIdx 
+        }
+        
+        if (cameraWidgets.isEmpty()) return
+
+        val wasOn = oldEntry?.state?.let { isStateOn(it) } ?: false
+        val isOn = isStateOn(newEntry.state)
+
+        if (isOn && !wasOn) {
+            cameraWidgets.forEach { camera ->
+                viewModelScope.launch {
+                    _autoOpenEvent.emit(camera)
+                }
+            }
+        }
+    }
+
+    private fun isStateOn(state: WidgetLiveState): Boolean = when (state) {
+        is WidgetLiveState.Light -> state.isOn
+        is WidgetLiveState.BinarySensor -> state.isOn
+        is WidgetLiveState.Scene -> state.isOn
+        is WidgetLiveState.Lock -> !state.isLocked
+        is WidgetLiveState.Sensor -> {
+            // For virtual sensors or generic ones, we check common "active" keywords in the data
+            val data = state.displayValue.lowercase()
+            data.contains("on") || data.contains("motion") || data.contains("open") || data.contains("alerte")
+        }
+        else -> false
     }
 
     /**
@@ -194,7 +251,7 @@ class DashboardViewModel(
         domoticzPollingJob?.cancel()
         domoticzPollingJob = viewModelScope.launch {
             repository.configFlow
-                .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "domoticz" } }
+                .map { cfg -> getObservedWidgets(cfg).filter { it.source?.provider == "domoticz" } }
                 .distinctUntilChanged()
                 .flatMapLatest { widgets -> domoticzRepository.observeScenePolling(widgets) }
                 .collect { states -> mergeDomoticzStates(states) }
@@ -202,27 +259,14 @@ class DashboardViewModel(
     }
 
     /**
-     * Starting state of device widgets (excluding scenes): a single
-     * bulk call each time the Domoticz widget list changes (addition,
-     * deletion, or first loading). Thereafter, no more periodic REST
-     * calls on devices — the websocket (see
-     * startDomoticzLiveUpdates) is the ONLY source of update.
-     *
-     * Assumed compromise ("full websocket"): if the websocket channel silently
-     * loses an event without the connection clearly cutting
-     * (rare but possible case), the concerned widget remains
-     * displayed with its last known value until the next change of
-     * widgets or app restart — there is no more periodic REST
-     * resync to catch up with this kind of offset. To be monitored
-     * in real use; if it proves annoying, the simplest workaround is
-     * a very spaced periodic call (e.g., every 5-10min) rather than
-     * returning to 5s polling.
+     * Starting state of device widgets (including triggers): a single
+     * bulk call each time the observed widget list changes.
      */
     private fun startDomoticzInitialFetch() {
         domoticzInitialFetchJob?.cancel()
         domoticzInitialFetchJob = viewModelScope.launch {
             repository.configFlow
-                .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "domoticz" } }
+                .map { cfg -> getObservedWidgets(cfg).filter { it.source?.provider == "domoticz" } }
                 .distinctUntilChanged()
                 .collect { widgets ->
                     mergeDomoticzStates(domoticzRepository.fetchInitialDeviceStates(widgets))
@@ -263,7 +307,7 @@ class DashboardViewModel(
 
         domoticzLiveJob = viewModelScope.launch {
             repository.configFlow
-                .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "domoticz" } }
+                .map { cfg -> getObservedWidgets(cfg).filter { it.source?.provider == "domoticz" } }
                 .distinctUntilChanged()
                 .onEach { widgets -> currentDomoticzWidgets = widgets }
                 .flatMapLatest { widgets -> domoticzRepository.observeLiveUpdates(widgets) }
@@ -728,6 +772,30 @@ class DashboardViewModel(
 // --- Page-aware helpers, private to this file ---
 
 private fun DashboardConfig.allWidgets(): List<WidgetConfig> = pages.flatMap { it.widgets }
+
+/**
+ * Returns all widgets to observe, including "virtual" ones for camera triggers
+ * that are not explicitly present on the dashboard.
+ */
+private fun getObservedWidgets(config: DashboardConfig): List<WidgetConfig> {
+    val realWidgets = config.pages.flatMap { it.widgets }
+    val existingIdx = realWidgets.mapNotNull { it.source?.deviceId }.toSet()
+
+    val virtualWidgets = realWidgets.filter { it.widgetType == WidgetType.CAMERA }
+        .mapNotNull { it.source?.triggerId }
+        .filter { it !in existingIdx }
+        .distinct()
+        .map { idx ->
+            WidgetConfig(
+                id = "virtual_trigger_$idx",
+                type = "sensor", // Default type for mapping, isStateOn will handle detection
+                x = 0, y = 0, w = 1, h = 1,
+                source = WidgetSource(provider = "domoticz", deviceId = idx)
+            )
+        }
+
+    return realWidgets + virtualWidgets
+}
 
 private fun DashboardConfig.findWidget(widgetId: String): WidgetConfig? =
     pages.firstNotNullOfOrNull { page -> page.widgets.firstOrNull { it.id == widgetId } }

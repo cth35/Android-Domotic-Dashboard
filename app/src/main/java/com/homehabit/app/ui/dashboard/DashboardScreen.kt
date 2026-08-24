@@ -110,6 +110,24 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     }
     val scope = rememberCoroutineScope()
 
+    // Automatic opening of camera modal on trigger
+    LaunchedEffect(Unit) {
+        viewModel.autoOpenEvent.collect { camera ->
+            cameraModalWidget = camera
+        }
+    }
+
+    // Automatic closing of camera modal if opened via trigger
+    LaunchedEffect(cameraModalWidget) {
+        // We only trigger auto-close if the widget has a triggerId (was opened automatically)
+        val triggerId = cameraModalWidget?.source?.triggerId
+        val seconds = cameraModalWidget?.source?.autoCloseSeconds ?: 60
+        if (triggerId != null && cameraModalWidget != null && seconds > 0) {
+            delay(seconds * 1000L)
+            cameraModalWidget = null
+        }
+    }
+
     // Keeps the ViewModel informed of the visible page: addWidget() needs
     // it to know where to place a new widget.
     LaunchedEffect(pagerState.currentPage) {
