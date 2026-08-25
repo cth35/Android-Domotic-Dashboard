@@ -48,6 +48,11 @@ class RtspPlayerNative {
                 }
             }
 
+            override fun onRtspStatusFailedUnauthorized() {
+                _state.value = RtspPlaybackState.ERROR
+                android.util.Log.e("RtspPlayerNative", "Echec d'authentification RTSP")
+            }
+
             override fun onRtspFirstFrameRendered() {
                 _state.value = RtspPlaybackState.PLAYING
                 retryCount = 0 // Reset on first success
@@ -64,8 +69,32 @@ class RtspPlayerNative {
         _state.value = RtspPlaybackState.CONNECTING
         
         val uri = Uri.parse(rtspUrl)
+
+        // Extract credentials if present in the URL (user:pwd@host)
+        var username: String? = null
+        var password: String? = null
+        uri.userInfo?.let { userInfo ->
+            val parts = userInfo.split(":", limit = 2)
+            username = parts.getOrNull(0)
+            password = parts.getOrNull(1)
+        }
+
+        // Clean the URI by removing userInfo to avoid "Invalid status code -1"
+        // caused by malformed RTSP requests on some servers.
+        val cleanUri = if (uri.userInfo != null) {
+            uri.buildUpon()
+                .encodedAuthority(
+                    (if (uri.host != null) uri.host else "") + 
+                    (if (uri.port != -1) ":${uri.port}" else "")
+                )
+                .build()
+        } else {
+            uri
+        }
+
         // socketTimeout not available in 5.3.0 in init()
-        view.init(uri, null, null, "HomeHabit/1.0")
+        // Use a more standard User-Agent to avoid rejection by some cameras
+        view.init(cleanUri, username, password, "vlc/3.0.16")
         view.debug = false
         view.start(true, false)
     }
