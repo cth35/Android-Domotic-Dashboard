@@ -427,6 +427,8 @@ class DashboardViewModel(
                 domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
                     state = WidgetLiveState.Light(
                         isOn = newValue,
+                        isColor = current?.isColor ?: false,
+                        isWhiteTunable = current?.isWhiteTunable ?: false,
                         brightness = current?.brightness,
                         colorHex = current?.colorHex
                     ),
@@ -450,6 +452,8 @@ class DashboardViewModel(
                 domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
                     state = WidgetLiveState.Light(
                         isOn = percent > 0,
+                        isColor = current?.isColor ?: false,
+                        isWhiteTunable = current?.isWhiteTunable ?: false,
                         brightness = percent,
                         colorHex = current?.colorHex
                     ),
@@ -473,6 +477,8 @@ class DashboardViewModel(
                 domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
                     state = WidgetLiveState.Light(
                         isOn = true,
+                        isColor = current?.isColor ?: false,
+                        isWhiteTunable = current?.isWhiteTunable ?: false,
                         brightness = current?.brightness,
                         colorHex = hex
                     ),
@@ -543,11 +549,15 @@ class DashboardViewModel(
     fun setThermostatSetpoint(widgetId: String, value: Float) {
         val widget = repository.current().findWidget(widgetId) ?: return
         val entry = _widgetStates.value[widgetId]
+        val current = entry?.state as? WidgetLiveState.Thermostat
         viewModelScope.launch {
             val ok = domoticzRepository.setThermostatSetpoint(widget, value)
             if (ok) {
                 domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
-                    state = WidgetLiveState.Thermostat(temperature = value),
+                    state = WidgetLiveState.Thermostat(
+                        temperature = value,
+                        trend = current?.trend ?: WidgetLiveState.Trend.STABLE
+                    ),
                     lastUpdate = System.currentTimeMillis(),
                     fallbackName = entry?.fallbackName
                 ))

@@ -45,7 +45,7 @@ private val WHITE_PRESETS = listOf(
 )
 
 /** Inactivity delay before automatic closure, after the last action (brightness or color). */
-private const val AUTO_CLOSE_DELAY_MS = 2_000L
+private const val AUTO_CLOSE_DELAY_MS = 10_000L
 
 @Composable
 fun LightAdjustDialog(
