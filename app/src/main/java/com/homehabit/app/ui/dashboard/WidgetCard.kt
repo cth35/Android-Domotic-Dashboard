@@ -334,11 +334,9 @@ private fun RelativeTimeBadge(lastUpdate: Long) {
 private fun WeatherContent(state: WidgetLiveState.Weather?) {
     val code = state?.weatherCode
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            iconForWeatherCode(code),
-            contentDescription = null,
-            tint = colorForWeatherCode(code),
-            modifier = Modifier.size(24.dp)
+        WeatherIcon(
+            code = code,
+            size = 32.dp
         )
         Text(
             text = state?.let { "${it.temperature}°" } ?: "--",
@@ -395,11 +393,9 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
-                Icon(
-                    iconForWeatherCode(day.weatherCode),
-                    contentDescription = day.condition,
-                    tint = colorForWeatherCode(day.weatherCode),
-                    modifier = Modifier.size(32.dp)
+                WeatherIcon(
+                    code = day.weatherCode,
+                    size = 32.dp
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -411,29 +407,6 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
             }
         }
     }
-}
-
-/** Broad mapping of WMO codes to an icon — same spirit as WeatherCodeMapper but for the glyph rather than the label. */
-internal fun iconForWeatherCode(code: Int?): ImageVector = when (code) {
-    0 -> Icons.Filled.WbSunny
-    1, 2 -> Icons.Filled.WbCloudy
-    3 -> Icons.Filled.Cloud
-    45, 48 -> Icons.Filled.Grain
-    51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> Icons.Filled.WaterDrop
-    71, 73, 75, 77, 85, 86 -> Icons.Filled.AcUnit
-    95, 96, 99 -> Icons.Filled.Bolt
-    else -> Icons.Filled.Cloud
-}
-
-/** Specific colors according to weather type for better readability. */
-internal fun colorForWeatherCode(code: Int?): Color = when (code) {
-    0 -> AccentOrange
-    1, 2, 3 -> TextSecondary
-    45, 48 -> TextMuted
-    51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> AccentBlueMuted
-    71, 73, 75, 77, 85, 86 -> TextPrimary
-    95, 96, 99 -> AccentOrange
-    else -> TextSecondary
 }
 
 @Composable

@@ -76,6 +76,7 @@ dependencies {
     implementation("org.videolan.android:libvlc-all:3.7.0")
     implementation("com.github.alexeyvasilyev:rtsp-client-android:5.3.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-svg:2.6.0")
 
     // Font Awesome icons (to activate in the next step)
     // implementation("com.mikepenz:iconics-core:5.4.0")

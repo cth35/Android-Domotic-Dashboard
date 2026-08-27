@@ -303,10 +303,9 @@ for a location in France," not the service of the same name.
   `HorizontalPager`'s page swipe (both respond to a horizontal gesture), as
   already noted for repositioning drag vs. page swipe — needs to be
   validated in practice.
-- **Icon mapping by WMO code** (`iconForWeatherCode`, in `WidgetCard.kt`) —
-  deliberately kept separate from `WeatherCodeMapper` (which only handles
-  the text label) rather than merged, so as not to couple the visual
-  mapping (Compose icon) to the data layer.
+- **Icon mapping by WMO code** (in `WeatherIcon.kt`) —
+  maps Open-Meteo codes to the Google Weather icons assets. This logic is
+  centralized in a dedicated component for easier updates.
 
 **Side effect**: `FakeStateProvider` now only contains the camera demo — the
 old fake values for lights/thermostat/shutter/lock were removed since they

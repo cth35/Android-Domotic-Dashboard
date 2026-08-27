@@ -51,11 +51,9 @@ fun WeatherDetailsModal(
                 
                 // Temperature and Condition
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = iconForWeatherCode(state.weatherCode),
-                        contentDescription = null,
-                        tint = colorForWeatherCode(state.weatherCode),
-                        modifier = Modifier.size(64.dp)
+                    WeatherIcon(
+                        code = state.weatherCode,
+                        size = 64.dp
                     )
                     Spacer(Modifier.width(20.dp))
                     Column {
