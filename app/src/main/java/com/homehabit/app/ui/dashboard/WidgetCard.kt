@@ -176,6 +176,7 @@ fun WidgetCard(
                         WidgetType.LOCK -> LockContent(state as? WidgetLiveState.Lock)
                         WidgetType.SENSOR -> SensorContent(config, state as? WidgetLiveState.Sensor, sparkline)
                         WidgetType.SCENE -> SceneContent(state as? WidgetLiveState.Scene)
+                        WidgetType.SELECTOR -> SelectorContent(state as? WidgetLiveState.Selector)
                         WidgetType.BINARY_SENSOR -> BinarySensorContent(state as? WidgetLiveState.BinarySensor)
                         else -> EmptyContent()
                     }
@@ -676,6 +677,39 @@ private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, 
                     .height(20.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun SelectorContent(state: WidgetLiveState.Selector?) {
+    val levelIdx = (state?.currentLevel ?: 0) / 10
+    val levelName = state?.levels?.getOrNull(levelIdx) ?: "Off"
+    val isOn = (state?.currentLevel ?: 0) > 0
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(if (isOn) AccentGreen.copy(alpha = 0.3f) else SurfaceVariantDark),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.List,
+                contentDescription = null,
+                tint = if (isOn) AccentGreen else TextSecondary,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = levelName.uppercase(),
+            color = if (isOn) TextPrimary else TextSecondary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

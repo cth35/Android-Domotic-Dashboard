@@ -728,6 +728,24 @@ class DashboardViewModel(
         }
     }
 
+    fun setSelectorLevel(widgetId: String, level: Int) {
+        val widget = repository.current().findWidget(widgetId) ?: return
+        val entry = _widgetStates.value[widgetId]
+        val current = entry?.state as? WidgetLiveState.Selector ?: return
+
+        viewModelScope.launch {
+            val ok = domoticzRepository.setSelectorLevel(widget, level)
+            if (ok) {
+                domoticzStates = domoticzStates + (widgetId to WidgetStateEntry(
+                    state = current.copy(currentLevel = level),
+                    lastUpdate = System.currentTimeMillis(),
+                    fallbackName = entry.fallbackName
+                ))
+                publishMergedStates()
+            }
+        }
+    }
+
     // --- Page management ---
 
     fun addPage(name: String? = null): Int {

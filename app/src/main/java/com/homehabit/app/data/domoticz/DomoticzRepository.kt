@@ -187,6 +187,11 @@ class DomoticzRepository(
         return client.setDimmerLevel(idx, percent.coerceIn(0, 100))
     }
 
+    suspend fun setSelectorLevel(widget: WidgetConfig, level: Int): Boolean {
+        val idx = extractIdx(widget) ?: return false
+        return client.setDimmerLevel(idx, level)
+    }
+
     suspend fun setColor(widget: WidgetConfig, hex: String, brightnessPercent: Int?): Boolean {
         val idx = extractIdx(widget) ?: return false
         return client.setColor(idx, hex, brightnessPercent)
@@ -331,6 +336,18 @@ class DomoticzRepository(
                     isContact = device.SwitchType?.contains("Contact", ignoreCase = true) == true ||
                         device.Name?.contains("Porte", ignoreCase = true) == true ||
                         device.Name?.contains("Fenetre", ignoreCase = true) == true
+                )
+            }
+
+            WidgetType.SELECTOR -> {
+                val levels = runCatching {
+                    val decoded = android.util.Base64.decode(device.LevelNames.orEmpty(), android.util.Base64.DEFAULT)
+                    String(decoded).split("|")
+                }.getOrDefault(emptyList())
+
+                WidgetLiveState.Selector(
+                    currentLevel = device.Level ?: 0,
+                    levels = levels
                 )
             }
 

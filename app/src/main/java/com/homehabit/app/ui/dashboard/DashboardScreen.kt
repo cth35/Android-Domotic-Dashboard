@@ -79,6 +79,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     var thermostatModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var weatherModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var lightModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
+    var selectorModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var managePageIndex by remember { mutableStateOf<Int?>(null) }
 
     // Management of the automatic display of controls (Auto-hide)
@@ -191,6 +192,8 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                                     { { viewModel.toggleLock(widgetConfig.id) } }
                                 widgetConfig.widgetType == WidgetType.SCENE ->
                                     { { viewModel.triggerScene(widgetConfig.id) } }
+                                widgetConfig.widgetType == WidgetType.SELECTOR ->
+                                    { { selectorModalWidget = widgetConfig } }
                                 widgetConfig.widgetType == WidgetType.BINARY_SENSOR -> null
                                 widgetConfig.widgetType == WidgetType.THERMOSTAT ->
                                     { { thermostatModalWidget = widgetConfig } }
@@ -382,6 +385,22 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
             onColorChange = { hex -> viewModel.setLightColor(widget.id, hex) },
             onDismiss = { lightModalWidget = null }
         )
+    }
+
+    selectorModalWidget?.let { widget ->
+        val state = widgetStates[widget.id]?.state as? WidgetLiveState.Selector
+        if (state != null) {
+            SelectorAdjustDialog(
+                label = widget.label ?: "Selecteur",
+                currentLevel = state.currentLevel,
+                levels = state.levels,
+                onLevelChange = { level: Int ->
+                    viewModel.setSelectorLevel(widget.id, level)
+                    selectorModalWidget = null
+                },
+                onDismiss = { selectorModalWidget = null }
+            )
+        }
     }
 
     ManageDialogHost(pageIndex = managePageIndex, pages = pages, viewModel = viewModel) {

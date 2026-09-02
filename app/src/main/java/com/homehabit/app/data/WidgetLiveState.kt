@@ -63,6 +63,11 @@ sealed class WidgetLiveState {
         val isContact: Boolean = false
     ) : WidgetLiveState()
 
+    data class Selector(
+        val currentLevel: Int,
+        val levels: List<String>
+    ) : WidgetLiveState()
+
     /**
      * Domoticz scene or group triggered with one tap. isGroup distinguishes the
      * two: a Group has a real togglable on/off state, a Scene is a

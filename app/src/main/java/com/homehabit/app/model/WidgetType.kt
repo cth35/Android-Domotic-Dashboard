@@ -13,6 +13,7 @@ enum class WidgetType {
     SENSOR,
     SCENE,
     SWITCH,
+    SELECTOR,
     BINARY_SENSOR,
     CLOCK,
     UNKNOWN;

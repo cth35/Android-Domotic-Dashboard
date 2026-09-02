@@ -40,6 +40,8 @@ data class DomoticzDeviceDto(
     // Configured setpoint (thermostats)
     val SetPoint: Double? = null,
     val Humidity: Double? = null,
+    // Selector levels (Base64 encoded string separated by |)
+    val LevelNames: String? = null,
     // Domoticz format: "yyyy-MM-dd HH:mm:ss", local time of the Domoticz server
     val LastUpdate: String? = null,
     // Raw JSON returned by Domoticz for color lights, e.g.:

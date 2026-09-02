@@ -77,7 +77,13 @@ object DomoticzTypeMapper {
 
             type.contains("Light", ignoreCase = true) ||
                 type.contains("Switch", ignoreCase = true) ||
-                switchType.contains("On/Off", ignoreCase = true) -> WidgetType.LIGHT
+                switchType.contains("On/Off", ignoreCase = true) -> {
+                if (switchType.contains("Selector", ignoreCase = true)) {
+                    WidgetType.SELECTOR
+                } else {
+                    WidgetType.LIGHT
+                }
+            }
 
             else -> WidgetType.UNKNOWN
         }
