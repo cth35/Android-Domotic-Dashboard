@@ -53,8 +53,8 @@ widgets, dark theme by default, screen kept always on.
 - Normal taps (light toggle) are disabled during editing to avoid accidental
   triggers during a drag.
 
-`WidgetCard` displays 6 types: weather, light, thermostat, shutter, lock,
-camera (Material Design icons as placeholders, to be replaced with
+`WidgetCard` displays 7 types: weather, light, thermostat, shutter, lock,
+camera, selector (Material Design icons as placeholders, to be replaced with
 Android-Iconics + FontAwesome). Dark theme (`ui/theme/`) taken from the
 approved mockups. `MainActivity` sets the `FLAG_KEEP_SCREEN_ON` flag (wall
 display). `usesCleartextTraffic="true"` is set in the manifest, necessary
@@ -470,6 +470,17 @@ handled for now — white/temperature modes fall back to "no color
 displayed" rather than inventing an approximate hue. For writing,
 `DomoticzClient.setColor()` always sends explicit RGB mode (`m=3`) via the
 Domoticz `setcolbrightnessvalue` command, untested on a real Hue bridge.
+
+## Selector switch (SELECTOR)
+
+Specific support for Domoticz "Selector Switch" devices, which allow choosing between several named modes (e.g., "Off", "Cinema", "Games").
+
+- **Detection** (`DomoticzTypeMapper.kt`): Devices identified as `Light/Switch` with the `Selector` switch type.
+- **Automatic Decoding**: The mode names are automatically extracted and decoded from the Base64-encoded `LevelNames` field provided by the Domoticz API.
+- **UI Interaction**:
+  - Tapping the widget opens a `SelectorAdjustDialog` displaying the full list of available modes.
+  - The current mode is highlighted, and the widget card displays its name.
+  - Selection sends a `switchlight` command with the corresponding `level` (multiples of 10) to Domoticz.
 
 ## Consistent theme (icons + tinted backgrounds based on state)
 
