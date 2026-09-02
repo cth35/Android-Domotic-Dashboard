@@ -83,6 +83,13 @@ sealed class WidgetLiveState {
     object Empty : WidgetLiveState()
 }
 
+data class ForecastPeriod(
+    val label: String, // "Matin", "Après-midi", "Soirée"
+    val temp: Int,
+    val weatherCode: Int?,
+    val condition: String
+)
+
 /**
  * One day of the forecast. dayLabel is already formed ("Mon", "Tue"...),
  * no formatting logic to redo on the UI side.
@@ -97,7 +104,8 @@ data class ForecastDay(
     val sunrise: String? = null,
     val sunset: String? = null,
     val precipProb: Int? = null,
-    val windSpeed: Double? = null
+    val windSpeed: Double? = null,
+    val periods: List<ForecastPeriod> = emptyList()
 )
 
 object FakeStateProvider {

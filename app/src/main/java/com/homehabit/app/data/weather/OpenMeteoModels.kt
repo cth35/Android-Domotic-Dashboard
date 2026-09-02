@@ -6,7 +6,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class OpenMeteoResponse(
     val current: OpenMeteoCurrent? = null,
-    val daily: OpenMeteoDaily? = null
+    val daily: OpenMeteoDaily? = null,
+    val hourly: OpenMeteoHourly? = null
 )
 
 @Serializable
@@ -27,4 +28,11 @@ data class OpenMeteoDaily(
     val sunset: List<String> = emptyList(),
     @SerialName("precipitation_probability_max") val precipProb: List<Int> = emptyList(),
     @SerialName("wind_speed_10m_max") val windSpeedMax: List<Double> = emptyList()
+)
+
+@Serializable
+data class OpenMeteoHourly(
+    val time: List<String> = emptyList(),
+    @SerialName("temperature_2m") val temperature: List<Double> = emptyList(),
+    @SerialName("weather_code") val weatherCode: List<Int> = emptyList()
 )

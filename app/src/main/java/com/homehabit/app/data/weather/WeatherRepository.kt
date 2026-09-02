@@ -48,7 +48,7 @@ class WeatherRepository(private val client: OpenMeteoClient) {
 
                     if (forecast != null) {
                         val state = if (isForecast) {
-                            val days = buildForecastDays(forecast.daily)
+                            val days = buildForecastDays(forecast.daily, forecast.hourly)
                             if (days.isEmpty()) continue
                             WidgetLiveState.Forecast(days)
                         } else {
@@ -80,13 +80,22 @@ class WeatherRepository(private val client: OpenMeteoClient) {
         }
     }
 
-    private fun buildForecastDays(daily: OpenMeteoDaily?): List<ForecastDay> {
+    private fun buildForecastDays(daily: OpenMeteoDaily?, hourly: OpenMeteoHourly?): List<ForecastDay> {
         if (daily == null) return emptyList()
         val size = minOf(daily.time.size, daily.weatherCode.size, daily.tempMax.size, daily.tempMin.size)
         if (size == 0) return emptyList()
 
         return (0 until size).map { i ->
             val code = daily.weatherCode[i]
+            
+            val periods = if (hourly != null && hourly.time.size >= (i + 1) * 24) {
+                listOf(
+                    buildPeriod("Matin", 9, i, hourly),
+                    buildPeriod("Après-midi", 15, i, hourly),
+                    buildPeriod("Soirée", 21, i, hourly)
+                )
+            } else emptyList()
+
             ForecastDay(
                 dateIso = daily.time[i],
                 dayLabel = formatDayLabel(daily.time[i]),
@@ -97,9 +106,22 @@ class WeatherRepository(private val client: OpenMeteoClient) {
                 sunrise = daily.sunrise.getOrNull(i)?.let { formatTimeLabel(it) },
                 sunset = daily.sunset.getOrNull(i)?.let { formatTimeLabel(it) },
                 precipProb = daily.precipProb.getOrNull(i),
-                windSpeed = daily.windSpeedMax.getOrNull(i)
+                windSpeed = daily.windSpeedMax.getOrNull(i),
+                periods = periods
             )
         }
+    }
+
+    private fun buildPeriod(label: String, hour: Int, dayIdx: Int, hourly: OpenMeteoHourly): com.homehabit.app.data.ForecastPeriod {
+        val idx = dayIdx * 24 + hour
+        val temp = hourly.temperature.getOrNull(idx)?.roundToInt() ?: 0
+        val code = hourly.weatherCode.getOrNull(idx)
+        return com.homehabit.app.data.ForecastPeriod(
+            label = label,
+            temp = temp,
+            weatherCode = code,
+            condition = WeatherCodeMapper.label(code)
+        )
     }
 
     /** "yyyy-MM-dd" -> "Mon"/"Tue"/... in French. Falls back to "--" if the format is unexpected. */

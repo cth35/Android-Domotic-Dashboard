@@ -165,6 +165,46 @@ private fun ForecastDayRow(day: ForecastDay) {
             DetailItem(Icons.Filled.WaterDrop, "${day.precipProb ?: 0}%", AccentBlueMuted)
             DetailItem(Icons.Filled.Air, "${day.windSpeed?.roundToInt() ?: "--"} km/h", TextSecondary)
         }
+
+        // Line 3: Periods (Morning, Afternoon, Evening)
+        if (day.periods.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                day.periods.forEach { period ->
+                    PeriodItem(period)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeriodItem(period: com.homehabit.app.data.ForecastPeriod) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = period.label.uppercase(),
+            color = TextMuted,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Black
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 1.dp)
+        ) {
+            WeatherIcon(code = period.weatherCode, size = 18.dp)
+            Spacer(Modifier.width(3.dp))
+            Text(
+                text = "${period.temp}°",
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
