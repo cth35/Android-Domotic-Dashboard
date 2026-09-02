@@ -87,7 +87,9 @@ data class ForecastPeriod(
     val label: String, // "Matin", "Après-midi", "Soirée"
     val temp: Int,
     val weatherCode: Int?,
-    val condition: String
+    val condition: String,
+    val precipProb: Int? = null,
+    val windSpeed: Double? = null
 )
 
 /**

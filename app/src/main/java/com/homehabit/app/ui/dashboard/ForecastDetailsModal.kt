@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,18 +58,39 @@ fun ForecastDetailsModal(
                     fontWeight = FontWeight.Black
                 )
                 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
+                
+                // Column Headers
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 110.dp, end = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    listOf("Matin", "Après-midi", "Soirée").forEach { 
+                        Text(
+                            text = it,
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(90.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                
+                Spacer(Modifier.height(8.dp))
                 
                 LazyColumn(
                     modifier = Modifier.weight(1f, fill = false),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(state.days) { day ->
                         ForecastDayRow(day)
                         if (day != state.days.last()) {
                             HorizontalDivider(
                                 color = SurfaceVariantDark,
-                                modifier = Modifier.padding(top = 8.dp),
+                                modifier = Modifier.padding(top = 12.dp),
                                 thickness = 1.dp
                             )
                         }
@@ -98,112 +120,108 @@ private fun ForecastDayRow(day: ForecastDay) {
             .fillMaxWidth()
             .padding(horizontal = 4.dp)
     ) {
-        // Line 1: Principal Info
+        // Line 1: Main Info (mock-style)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = day.dayLabel,
-                color = TextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Black,
-                modifier = Modifier.width(60.dp)
-            )
-            
-            WeatherIcon(
-                code = day.weatherCode,
-                size = 32.dp
-            )
-            
-            Spacer(Modifier.width(10.dp))
-            
-            Text(
-                text = day.condition,
-                color = TextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Left Column: Day, Condition, Min/Max
+            Column(modifier = Modifier.width(90.dp)) {
                 Text(
-                    text = "${day.tempMax}°",
+                    text = day.dayLabel,
                     color = TextPrimary,
-                    fontSize = 18.sp,
+                    fontSize = 19.sp,
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    text = " / ",
+                    text = day.condition,
                     color = TextSecondary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "${day.tempMin}°",
+                    text = "${day.tempMax}° / ${day.tempMin}°",
                     color = TextSecondary,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
+
+            // Vertical Divider
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .width(1.dp)
+                    .height(70.dp)
+                    .background(SurfaceVariantDark)
+            )
+
+            // Matin / Après-midi / Soirée Columns
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                day.periods.forEach { period ->
+                    Row(
+                        modifier = Modifier.width(90.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            WeatherIcon(
+                                code = period.weatherCode,
+                                size = 34.dp
+                            )
+                            Text(
+                                text = "${period.temp}°",
+                                color = TextPrimary,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Column(horizontalAlignment = Alignment.Start) {
+                            // Secondary info: Rain and Wind
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.WaterDrop, null, tint = AccentBlueMuted, modifier = Modifier.size(13.dp))
+                                Text(
+                                    text = "${period.precipProb ?: 0}%",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(Modifier.height(3.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Air, null, tint = TextMuted, modifier = Modifier.size(13.dp))
+                                Text(
+                                    text = period.windSpeed?.roundToInt()?.toString() ?: "--",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
+        
+        Spacer(Modifier.height(10.dp))
         
         // Line 2: Details (Sunrise, Sunset, Rain, Wind)
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(SurfaceVariantDark.copy(alpha = 0.4f))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             DetailItem(Icons.Filled.WbSunny, day.sunrise ?: "--:--", AccentOrange)
             DetailItem(Icons.Filled.WbTwilight, day.sunset ?: "--:--", AccentOrange)
             DetailItem(Icons.Filled.WaterDrop, "${day.precipProb ?: 0}%", AccentBlueMuted)
             DetailItem(Icons.Filled.Air, "${day.windSpeed?.roundToInt() ?: "--"} km/h", TextSecondary)
-        }
-
-        // Line 3: Periods (Morning, Afternoon, Evening)
-        if (day.periods.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                day.periods.forEach { period ->
-                    PeriodItem(period)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PeriodItem(period: com.homehabit.app.data.ForecastPeriod) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = period.label.uppercase(),
-            color = TextMuted,
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Black
-        )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 1.dp)
-        ) {
-            WeatherIcon(code = period.weatherCode, size = 18.dp)
-            Spacer(Modifier.width(3.dp))
-            Text(
-                text = "${period.temp}°",
-                color = TextPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }

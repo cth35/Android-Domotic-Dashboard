@@ -34,5 +34,7 @@ data class OpenMeteoDaily(
 data class OpenMeteoHourly(
     val time: List<String> = emptyList(),
     @SerialName("temperature_2m") val temperature: List<Double> = emptyList(),
-    @SerialName("weather_code") val weatherCode: List<Int> = emptyList()
+    @SerialName("weather_code") val weatherCode: List<Int> = emptyList(),
+    @SerialName("precipitation_probability") val precipProb: List<Int> = emptyList(),
+    @SerialName("wind_speed_10m") val windSpeed: List<Double> = emptyList()
 )

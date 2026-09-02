@@ -120,7 +120,9 @@ class WeatherRepository(private val client: OpenMeteoClient) {
             label = label,
             temp = temp,
             weatherCode = code,
-            condition = WeatherCodeMapper.label(code)
+            condition = WeatherCodeMapper.label(code),
+            precipProb = hourly.precipProb.getOrNull(idx),
+            windSpeed = hourly.windSpeed.getOrNull(idx)
         )
     }
 
