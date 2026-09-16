@@ -477,10 +477,23 @@ Specific support for Domoticz "Selector Switch" devices, which allow choosing be
 
 - **Detection** (`DomoticzTypeMapper.kt`): Devices identified as `Light/Switch` with the `Selector` switch type.
 - **Automatic Decoding**: The mode names are automatically extracted and decoded from the Base64-encoded `LevelNames` field provided by the Domoticz API.
-- **UI Interaction**:
+- **UI Interaction (Default)**:
   - Tapping the widget opens a `SelectorAdjustDialog` displaying the full list of available modes.
   - The current mode is highlighted, and the widget card displays its name.
   - Selection sends a `switchlight` command with the corresponding `level` (multiples of 10) to Domoticz.
+
+- **Button Style UI (Advanced)**:
+  A selector can be transformed into a set of direct-action buttons, ideal for Volume controls (Up/Down/Mute) or Source selection. This is configured via the `source` object in the JSON:
+  - `selectorStyle`: Set to `"buttons"`.
+  - `selectorLevels`: (Optional) List of level integers to display (e.g., `[10, 20, 30]`). Useful for hiding the "Off" state.
+  - `selectorIcons`: (Optional) Map of level IDs to icon names in `snake_case` (e.g., `"10": "volume_up"`).
+  - `showStatus`: (Optional) Set to `false` to hide the current state label at the top.
+  - `highlightActive`: (Optional) Set to `false` to disable persistent highlighting of the last pressed button (ideal for impulse-only controls like Volume).
+  - **Responsive Layout**:
+    - **1x1 widgets**: Up to 3 buttons on one row.
+    - **Larger widgets**: Up to 2 rows of 3 to 4 buttons depending on width.
+    - **Fallback**: If no icon is mapped, the button displays the first 3 letters of the level name.
+    - **Icon Registry**: Supports common smart home icons like `volume_up`, `volume_down`, `volume_mute`, `play_arrow`, `pause`, `stop`, `tv`, `speaker`, etc. (mapped in `WidgetIcons.kt`).
 
 ## Consistent theme (icons + tinted backgrounds based on state)
 

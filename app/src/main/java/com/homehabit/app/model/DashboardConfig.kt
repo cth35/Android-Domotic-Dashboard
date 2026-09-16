@@ -96,5 +96,10 @@ data class WidgetSource(
     val sensorMode: String? = null,     // "temp" (default), "humidity" or "both"
     val useRtspClientNative: Boolean? = null, // CAMERA widget only, overrides global setting
     val triggerId: String? = null,      // e.g. "idx:24", CAMERA widget only
-    val autoCloseSeconds: Int? = null   // default 60s, CAMERA widget only
+    val autoCloseSeconds: Int? = null,  // default 60s, CAMERA widget only
+    val selectorStyle: String? = null,   // "buttons" or null (default)
+    val selectorLevels: List<Int>? = null, // List of levels to show (e.g. [10, 20])
+    val selectorIcons: Map<String, String>? = null, // Level -> icon_name (snake_case)
+    val showStatus: Boolean? = true,     // Whether to show the current level name
+    val highlightActive: Boolean? = true // Whether to highlight the currently active level
 )

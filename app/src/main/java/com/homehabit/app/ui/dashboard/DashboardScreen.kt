@@ -212,6 +212,9 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                             } else null,
                             onShutterClose = if (!isEditMode && isButtonsShutter) {
                                 { viewModel.setShutterOpen(widgetConfig.id, false) }
+                            } else null,
+                            onSelectorLevelChange = if (!isEditMode && widgetConfig.widgetType == WidgetType.SELECTOR) {
+                                { level -> viewModel.setSelectorLevel(widgetConfig.id, level) }
                             } else null
                         )
                     }

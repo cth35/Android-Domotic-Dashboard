@@ -5,9 +5,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,7 +96,8 @@ fun WidgetCard(
     onLongClick: (() -> Unit)? = null,
     onShutterOpen: (() -> Unit)? = null,
     onShutterStop: (() -> Unit)? = null,
-    onShutterClose: (() -> Unit)? = null
+    onShutterClose: (() -> Unit)? = null,
+    onSelectorLevelChange: ((Int) -> Unit)? = null
 ) {
     val state = entry?.state
     val light = state as? WidgetLiveState.Light
@@ -176,7 +178,11 @@ fun WidgetCard(
                         WidgetType.LOCK -> LockContent(state as? WidgetLiveState.Lock)
                         WidgetType.SENSOR -> SensorContent(config, state as? WidgetLiveState.Sensor, sparkline)
                         WidgetType.SCENE -> SceneContent(state as? WidgetLiveState.Scene)
-                        WidgetType.SELECTOR -> SelectorContent(state as? WidgetLiveState.Selector)
+                        WidgetType.SELECTOR -> SelectorContent(
+                            config,
+                            state as? WidgetLiveState.Selector,
+                            onSelectorLevelChange
+                        )
                         WidgetType.BINARY_SENSOR -> BinarySensorContent(state as? WidgetLiveState.BinarySensor)
                         else -> EmptyContent()
                     }
@@ -681,7 +687,20 @@ private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, 
 }
 
 @Composable
-private fun SelectorContent(state: WidgetLiveState.Selector?) {
+private fun SelectorContent(
+    config: WidgetConfig,
+    state: WidgetLiveState.Selector?,
+    onLevelChange: ((Int) -> Unit)?
+) {
+    if (config.source?.selectorStyle == "buttons") {
+        SelectorButtonsContent(config, state, onLevelChange)
+    } else {
+        SelectorDefaultContent(state)
+    }
+}
+
+@Composable
+private fun SelectorDefaultContent(state: WidgetLiveState.Selector?) {
     val levelIdx = (state?.currentLevel ?: 0) / 10
     val levelName = state?.levels?.getOrNull(levelIdx) ?: "Off"
     val isOn = (state?.currentLevel ?: 0) > 0
@@ -710,6 +729,125 @@ private fun SelectorContent(state: WidgetLiveState.Selector?) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+private fun SelectorButtonsContent(
+    config: WidgetConfig,
+    state: WidgetLiveState.Selector?,
+    onLevelChange: ((Int) -> Unit)?
+) {
+    val allLevels = state?.levels ?: emptyList()
+    val whitelist = config.source?.selectorLevels
+    val icons = config.source?.selectorIcons ?: emptyMap()
+
+    // Filter levels based on whitelist if present
+    val levelsToShow = allLevels.mapIndexedNotNull { index, name ->
+        val level = index * 10
+        if (whitelist == null || level in whitelist) {
+            level to name
+        } else null
+    }
+
+    val currentLevel = state?.currentLevel ?: 0
+    val showStatus = config.source?.showStatus != false
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (showStatus) {
+            val currentIdx = currentLevel / 10
+            val currentName = allLevels.getOrNull(currentIdx) ?: "Off"
+            Text(
+                text = currentName.uppercase(),
+                color = if (currentLevel > 0) AccentGreen else TextSecondary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+
+        // Logic for layout: up to 3 icons in one row, then 2 rows for up to 6
+        // For 1x1, we try to stay on one row of 3, or use overflow
+        val maxButtonsPerRow = if (config.w > 1) 4 else 3
+        val rows = levelsToShow.chunked(maxButtonsPerRow)
+
+        // Show max 2 rows or max 6 buttons total in small widgets
+        val rowsToShow = if (config.w == 1 && config.h == 1) rows.take(1) else rows.take(2)
+        val highlightActive = config.source?.highlightActive != false
+
+        rowsToShow.forEach { rowLevels ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(vertical = 4.dp)
+            ) {
+                rowLevels.forEach { (level, name) ->
+                    val isSelected = highlightActive && level == currentLevel
+                    val iconName = icons[level.toString()]
+                    val icon = WidgetIcons.fromName(iconName)
+
+                    LocalIconButton(
+                        onClick = { onLevelChange?.invoke(level) },
+                        modifier = Modifier.size(36.dp),
+                        backgroundColor = if (isSelected) AccentGreen.copy(alpha = 0.2f) else SurfaceVariantDark,
+                        borderColor = if (isSelected) AccentGreen else Color.Transparent
+                    ) {
+                        if (icon != null) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = name,
+                                tint = if (isSelected) AccentGreen else TextPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        } else {
+                            // Fallback to text if no icon
+                            Text(
+                                text = name.take(3).uppercase(),
+                                color = if (isSelected) AccentGreen else TextPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = SurfaceVariantDark,
+    borderColor: Color = Color.Transparent,
+    content: @Composable () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    // Show highlight color during press even if it's not the selected state
+    val effectiveBg = if (isPressed) AccentGreen.copy(alpha = 0.4f) else backgroundColor
+    val effectiveBorder = if (isPressed) AccentGreen else borderColor
+
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(effectiveBg)
+            .drawBehind {
+                if (effectiveBorder != Color.Transparent) {
+                    drawCircle(color = effectiveBorder, style = Stroke(width = 1.dp.toPx()))
+                }
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null, // Custom visual feedback via background change
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
     }
 }
 
