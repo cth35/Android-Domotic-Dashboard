@@ -81,6 +81,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     var lightModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var selectorModalWidget by remember { mutableStateOf<WidgetConfig?>(null) }
     var managePageIndex by remember { mutableStateOf<Int?>(null) }
+    var renameWidgetTarget by remember { mutableStateOf<WidgetConfig?>(null) }
 
     // Management of the automatic display of controls (Auto-hide)
     var controlsVisible by remember { mutableStateOf(false) }
@@ -164,6 +165,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                         onResizeUpdate = viewModel::updateWidgetRect,
                         onMoveCommit = viewModel::applyLayout,
                         onDeleteWidget = viewModel::removeWidget,
+                        onEditWidgetName = { widget -> renameWidgetTarget = widget },
                         onBackgroundClick = ::pokeControls
                     ) { widgetConfig ->
                         val isDimmableLight = widgetConfig.widgetType == WidgetType.DIMMER ||
@@ -406,6 +408,21 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
         }
     }
 
+    renameWidgetTarget?.let { widget ->
+        val entry = widgetStates[widget.id]
+        EditWidgetNameDialog(
+            currentLabel = widget.label ?: "",
+            currentBackgroundColor = widget.backgroundColor,
+            currentBackgroundAlpha = widget.backgroundAlpha,
+            fallbackName = entry?.fallbackName,
+            onSave = { newLabel, newBgColor, newBgAlpha ->
+                viewModel.updateWidgetConfig(widget.id, newLabel, newBgColor, newBgAlpha)
+                renameWidgetTarget = null
+            },
+            onDismiss = { renameWidgetTarget = null }
+        )
+    }
+
     ManageDialogHost(pageIndex = managePageIndex, pages = pages, viewModel = viewModel) {
         managePageIndex = null
     }
@@ -525,6 +542,7 @@ private fun DashboardGrid(
     onResizeUpdate: (String, GridEngine.Rect) -> Unit,
     onMoveCommit: (Map<String, GridEngine.Rect>) -> Unit,
     onDeleteWidget: (String) -> Unit,
+    onEditWidgetName: (WidgetConfig) -> Unit,
     onBackgroundClick: () -> Unit,
     content: @Composable (widget: WidgetConfig) -> Unit
 ) {
@@ -628,7 +646,8 @@ private fun DashboardGrid(
                                 },
                                 onMoveCancel = { dragState = null },
                                 onResizeUpdate = onResizeUpdate,
-                                onDelete = { onDeleteWidget(widget.id) }
+                                onDelete = { onDeleteWidget(widget.id) },
+                                onEditName = { onEditWidgetName(widget) }
                             )
                         }
                     }
@@ -663,7 +682,8 @@ private fun DashboardGrid(
                                 },
                                 onMoveCancel = { dragState = null },
                                 onResizeUpdate = onResizeUpdate,
-                                onDelete = { onDeleteWidget(widget.id) }
+                                onDelete = { onDeleteWidget(widget.id) },
+                                onEditName = { onEditWidgetName(widget) }
                             )
                         }
                     }
@@ -705,7 +725,8 @@ private fun EditOverlay(
     onMoveCommit: (Map<String, GridEngine.Rect>) -> Unit,
     onMoveCancel: () -> Unit,
     onResizeUpdate: (String, GridEngine.Rect) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEditName: () -> Unit
 ) {
     val latestWidget = rememberUpdatedState(widget)
     val latestAllWidgets = rememberUpdatedState(allWidgets)
@@ -798,6 +819,25 @@ private fun EditOverlay(
                     )
                 }
         )
+
+        // Edition du nom du widget
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(HANDLE_SIZE)
+                .clip(CircleShape)
+                .background(AccentBlue)
+                .clickable(onClick = onEditName),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.Edit,
+                contentDescription = "Renommer le widget",
+                tint = TextPrimary,
+                modifier = Modifier.size(13.dp)
+            )
+        }
 
         // Deletion: no confirmation (consistent with the rest of the
         // app — removePage does not have one either), one tap is enough. To

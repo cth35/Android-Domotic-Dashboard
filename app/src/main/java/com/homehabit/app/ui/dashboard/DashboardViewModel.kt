@@ -643,6 +643,38 @@ class DashboardViewModel(
         )
     }
 
+    fun updateWidgetLabel(widgetId: String, newLabel: String) {
+        val widget = repository.current().findWidget(widgetId)
+        updateWidgetConfig(widgetId, newLabel, widget?.backgroundColor, widget?.backgroundAlpha)
+    }
+
+    fun updateWidgetConfig(
+        widgetId: String,
+        newLabel: String?,
+        newBackgroundColor: String?,
+        newBackgroundAlpha: Float?
+    ) {
+        val current = repository.current()
+        val pageIndex = current.pageIndexOf(widgetId) ?: return
+        val page = current.pages[pageIndex]
+
+        val trimmedLabel = newLabel?.trim()?.ifBlank { null }
+        val trimmedColor = newBackgroundColor?.trim()?.ifBlank { null }
+
+        val updatedWidgets = page.widgets.map { widget ->
+            if (widget.id == widgetId) {
+                widget.copy(
+                    label = trimmedLabel,
+                    backgroundColor = trimmedColor,
+                    backgroundAlpha = newBackgroundAlpha
+                )
+            } else {
+                widget
+            }
+        }
+        repository.updateConfig(current.replacingPage(pageIndex, page.copy(widgets = updatedWidgets)))
+    }
+
     /**
      * "Already used" checked on ALL pages, but only among
      * non-scene widgets: devices and scenes/groups are two distinct Domoticz

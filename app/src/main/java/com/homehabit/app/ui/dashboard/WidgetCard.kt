@@ -77,6 +77,20 @@ fun formatRelativeTime(epochMillis: Long, now: Long = System.currentTimeMillis()
 }
 
 
+fun parseWidgetBackgroundColor(hex: String?, alpha: Float?): Color? {
+    if (hex.isNullOrBlank()) return null
+    return runCatching {
+        val formattedHex = if (hex.startsWith("#")) hex else "#$hex"
+        val parsed = android.graphics.Color.parseColor(formattedHex)
+        val baseColor = Color(parsed)
+        if (alpha != null) {
+            baseColor.copy(alpha = alpha.coerceIn(0f, 1f))
+        } else {
+            baseColor
+        }
+    }.getOrNull()
+}
+
 /**
  * Displays the content of a widget according to its type. Icons use
  * Material Icons here as a placeholder; they will be replaced by
@@ -106,8 +120,9 @@ fun WidgetCard(
     val lock = state as? WidgetLiveState.Lock
 
     // We stay on a uniform dark background like HomeHabit, except for
-    // very specific feedback (e.g., lock alert).
-    val backgroundColor = when (config.widgetType) {
+    // custom background color or specific feedback (e.g., lock alert).
+    val customBg = parseWidgetBackgroundColor(config.backgroundColor, config.backgroundAlpha)
+    val backgroundColor = customBg ?: when (config.widgetType) {
         WidgetType.LOCK -> if (lock?.isLocked == false) AccentRedSurface else SurfaceDark
         else -> SurfaceDark
     }

@@ -77,6 +77,8 @@ data class WidgetConfig(
     val w: Int,
     val h: Int,
     val label: String? = null,
+    val backgroundColor: String? = null,
+    val backgroundAlpha: Float? = null,
     val source: WidgetSource? = null
 ) {
     val widgetType: WidgetType get() = WidgetType.fromRaw(type)
