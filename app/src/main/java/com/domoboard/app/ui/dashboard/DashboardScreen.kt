@@ -411,12 +411,14 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     renameWidgetTarget?.let { widget ->
         val entry = widgetStates[widget.id]
         EditWidgetNameDialog(
+            widgetType = widget.widgetType,
+            currentSensorMode = widget.source?.sensorMode,
             currentLabel = widget.label ?: "",
             currentBackgroundColor = widget.backgroundColor,
             currentBackgroundAlpha = widget.backgroundAlpha,
             fallbackName = entry?.fallbackName,
-            onSave = { newLabel, newBgColor, newBgAlpha ->
-                viewModel.updateWidgetConfig(widget.id, newLabel, newBgColor, newBgAlpha)
+            onSave = { newLabel, newBgColor, newBgAlpha, newSensorMode ->
+                viewModel.updateWidgetConfig(widget.id, newLabel, newBgColor, newBgAlpha, newSensorMode)
                 renameWidgetTarget = null
             },
             onDismiss = { renameWidgetTarget = null }

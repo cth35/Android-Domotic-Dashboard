@@ -202,7 +202,7 @@ fun WidgetCard(
                         else -> EmptyContent()
                     }
                 }
-                
+
                 Spacer(Modifier.weight(1f))
             }
         }
@@ -315,9 +315,9 @@ private fun BinarySensorContent(state: WidgetLiveState.BinarySensor?) {
                 modifier = Modifier.size(28.dp)
             )
         }
-        
+
         Spacer(Modifier.height(6.dp))
-        
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = when {
@@ -409,8 +409,8 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = day.dayLabel, 
-                    color = TextSecondary, 
+                    text = day.dayLabel,
+                    color = TextSecondary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -421,8 +421,8 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "${day.tempMax}°", 
-                    color = TextPrimary, 
+                    text = "${day.tempMax}°",
+                    color = TextPrimary,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
@@ -434,8 +434,8 @@ private fun ForecastContent(state: WidgetLiveState.Forecast?) {
 @Composable
 private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
     val isOn = state?.isOn == true
-    
-    // We display the color/shade if available in the state, 
+
+    // We display the color/shade if available in the state,
     // regardless of the widget type (RGB or WW).
     val swatchColor = if (isOn) {
         state?.colorHex?.let { hex ->
@@ -445,7 +445,7 @@ private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
 
     val isColorLight = config.widgetType == WidgetType.COLOR_LIGHT && state?.isColor == true
     val color = if (isOn) AccentGreen else TextMuted
-    
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
@@ -479,7 +479,7 @@ private fun LightContent(config: WidgetConfig, state: WidgetLiveState.Light?) {
                 modifier = Modifier.size(28.dp)
             )
         }
-        
+
         if (isColorLight && isOn) {
             Spacer(Modifier.height(6.dp))
             Row(
@@ -632,7 +632,7 @@ private fun LockContent(state: WidgetLiveState.Lock?) {
 private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, sparkline: List<Float>?) {
     val sensorMode = config.source?.sensorMode ?: "temp"
     val isTemp = state?.kind == SensorKind.TEMPERATURE
-    
+
     // Determine main display values
     val (mainValue, mainUnit, showTrend) = when {
         isTemp && sensorMode == "humidity" && state?.humidityValue != null -> {
@@ -647,32 +647,81 @@ private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, 
         }
     }
 
+    // "both" mode: humidity sits under the unit sign ("°"), starting at its left edge.
+    // The "°" glyph is at the top of the line, so the space under it is free:
+    // the main value keeps the same font size whether humidity is shown or not.
+    val humidityVal = state?.humidityValue
+    val showBothHumidity = isTemp && sensorMode == "both" && humidityVal != null
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Digits only
             Text(
-                text = mainValue.replace(".", ",") + mainUnit,
+                text = mainValue.replace(".", ","),
                 color = TextPrimary,
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Visible
             )
-            if (showTrend) {
-                state?.trend?.let {
-                    TrendArrow(it, Modifier.padding(start = 4.dp))
+            // Unit + trend arrow (top row), humidity overlaid at the bottom-start
+            Box {
+                Row(
+                    verticalAlignment = if (showBothHumidity) Alignment.Top else Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = mainUnit,
+                        color = TextPrimary,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Visible
+                    )
+                    if (showTrend) {
+                        state?.trend?.let {
+                            TrendArrow(
+                                it,
+                                Modifier.padding(
+                                    start = 4.dp,
+                                    top = if (showBothHumidity) 6.dp else 0.dp
+                                )
+                            )
+                        }
+                    }
+                }
+                if (showBothHumidity && humidityVal != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            // unbounded: never squeezed by the available width
+                            .wrapContentWidth(align = Alignment.Start, unbounded = true)
+                            .padding(bottom = 3.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.WaterDrop,
+                            contentDescription = null,
+                            tint = AccentBlueMuted,
+                            modifier = Modifier.size(11.dp)
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = "${humidityVal.toInt()}%",
+                            color = TextSecondary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
                 }
             }
         }
 
-        // Secondary display for "both" mode
-        if (isTemp && sensorMode == "both" && state?.humidityValue != null) {
-            Text(
-                text = "Humidité: ${state.humidityValue.toInt()}%",
-                color = TextSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium
-            )
-        } else {
+        // Secondary display (unit label) when humidity is not shown in the right column
+        if (!showBothHumidity) {
             val kindUnit = when (state?.kind) {
                 SensorKind.TEMPERATURE -> "" // Displayed via mainUnit or handled above
                 SensorKind.HUMIDITY -> "PERCENT"
@@ -687,7 +736,7 @@ private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, 
                 )
             }
         }
-        
+
         if (sparkline != null && sparkline.size >= 2) {
             Spacer(Modifier.height(2.dp))
             Sparkline(
