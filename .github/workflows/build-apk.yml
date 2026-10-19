@@ -33,8 +33,8 @@ jobs:
       - name: Préparer et renommer les APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/*.apk dist/Domotic-Dashboard-debug.apk
-          cp app/build/outputs/apk/release/*.apk dist/Domotic-Dashboard-release-unsigned.apk
+          cp app/build/outputs/apk/debug/*.apk dist/DomoBoard-debug.apk
+          cp app/build/outputs/apk/release/*.apk dist/DomoBoard-release-unsigned.apk
 
       - name: Sauvegarder les artefacts (pour lancements manuels)
         uses: actions/upload-artifact@v4

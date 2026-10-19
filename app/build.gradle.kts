@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.homehabit.app"
+    namespace = "com.domoboard.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.homehabit.app"
+        applicationId = "com.domoboard.app"
         // Version 24 required for rtsp-client-android (low-latency MediaCodec)
         minSdk = 24
         targetSdk = 34

@@ -11,10 +11,10 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
-        android:name=".HomeHabitApp"
+        android:name=".DomoBoardApp"
         android:allowBackup="true"
-        android:label="HomeHabit"
-        android:theme="@style/Theme.HomeHabit"
+        android:label="DomoBoard"
+        android:theme="@style/Theme.DomoBoard"
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true"
         tools:replace="android:allowBackup,android:label,android:extractNativeLibs">
@@ -37,7 +37,7 @@
              Jamais actif tant que l'utilisateur ne l'a pas explicitement
              accorde via l'ecran de reglages. -->
         <receiver
-            android:name=".power.HomeHabitDeviceAdminReceiver"
+            android:name=".power.DomoBoardDeviceAdminReceiver"
             android:exported="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data

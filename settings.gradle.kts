@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "HomeHabit"
+rootProject.name = "DomoBoard"
 include(":app")
