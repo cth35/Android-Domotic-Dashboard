@@ -19,8 +19,19 @@ sealed class WidgetLiveState {
         val humidity: Int? = null,
         val windSpeed: Double? = null,
         val sunrise: String? = null, // "HH:mm"
-        val sunset: String? = null    // "HH:mm"
+        val sunset: String? = null,   // "HH:mm"
+        val vigilanceLevel: Int? = null, // 1: Vert, 2: Jaune, 3: Orange, 4: Rouge
+        val vigilanceColorName: String? = null,
+        val vigilancePhenomenons: List<Pair<String, Int>> = emptyList(), // name -> colorId
+        val vigilanceDetails: List<VigilanceDetail> = emptyList()
     ) : WidgetLiveState()
+
+    data class VigilanceDetail(
+        val boldText: String?,
+        val textLines: List<String>,
+        val startTime: String?,
+        val endTime: String?
+    )
 
     data class Light(
         val isOn: Boolean,

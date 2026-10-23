@@ -29,6 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -355,6 +358,15 @@ private fun RelativeTimeBadge(lastUpdate: Long) {
 @Composable
 private fun WeatherContent(state: WidgetLiveState.Weather?) {
     val code = state?.weatherCode
+    val vigilanceLevel = state?.vigilanceLevel ?: 1
+    val vigilanceColor = when (vigilanceLevel) {
+        1 -> Color(0xFF4CAF50) // Green
+        2 -> Color(0xFFFFEB3B) // Yellow
+        3 -> Color(0xFFFF9800) // Orange
+        4 -> Color(0xFFF44336) // Red
+        else -> TextSecondary
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         WeatherIcon(
             code = code,
@@ -368,7 +380,15 @@ private fun WeatherContent(state: WidgetLiveState.Weather?) {
             lineHeight = 32.sp
         )
         Text(
-            text = state?.let { "${it.condition} · ${it.min}°/${it.max}°" } ?: "Chargement...",
+            text = buildAnnotatedString {
+                append(state?.let { "${it.condition} · ${it.min}°/${it.max}°" } ?: "Chargement...")
+                if (state?.vigilanceColorName != null) {
+                    append(" · ")
+                    withStyle(SpanStyle(color = vigilanceColor, fontWeight = FontWeight.Bold)) {
+                        append("Vig. ${state.vigilanceColorName}")
+                    }
+                }
+            },
             color = TextSecondary,
             fontSize = 9.sp,
             textAlign = TextAlign.Center,

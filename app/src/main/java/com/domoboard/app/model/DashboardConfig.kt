@@ -33,6 +33,7 @@ data class AppSettings(
     val domoticzUseHttps: Boolean = false,
     val domoticzUsername: String? = null,
     val domoticzPassword: String? = null,
+    val meteoFranceApiKey: String? = null,
     // Automatically generated at first launch (ConfigRepository),
     // never left empty in practice. Protects the embedded HTTP server.
     val httpAuthToken: String = "",
@@ -93,6 +94,7 @@ data class WidgetSource(
     val refreshSeconds: Int? = null,    // snapshot refresh frequency
     val latitude: Double? = null,       // weather widget (Open-Meteo works in lat/lon)
     val longitude: Double? = null,
+    val department: String? = null,     // Météo-France department code (e.g. "75")
     val shutterStyle: String? = null,   // "buttons" (default) or "toggle", SHUTTER widget only
     val imageScale: String? = null,     // "crop" (default) or "fit", CAMERA widget only
     val sensorMode: String? = null,     // "temp" (default), "humidity" or "both"

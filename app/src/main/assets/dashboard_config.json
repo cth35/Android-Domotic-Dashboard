@@ -4,7 +4,8 @@
     "domoticzPort": 8080,
     "domoticzUseHttps": false,
     "domoticzUsername": null,
-    "domoticzPassword": null
+    "domoticzPassword": null,
+    "meteoFranceApiKey": ""
   },
   "pages": [
     {
@@ -25,7 +26,8 @@
           "source": {
             "provider": "open-meteo",
             "latitude": 48.8566,
-            "longitude": 2.3522
+            "longitude": 2.3522,
+            "department": "75"
           }
         },
         {

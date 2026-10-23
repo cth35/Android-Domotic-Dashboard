@@ -14,9 +14,11 @@ import kotlin.math.roundToInt
 
 class WeatherRepository(private val client: OpenMeteoClient) {
 
+    private val meteoFranceClient = MeteoFranceClient()
+
     /**
      * Weather changes slowly: no need to poll as often as
-     * Domoticz. 15 minutes by default, largely sufficient and avoids
+     * Domoticz. 5 minutes by default, largely sufficient and avoids
      * soliciting the API for nothing.
      *
      * A single Open-Meteo call per widget is enough for both types
@@ -25,6 +27,7 @@ class WeatherRepository(private val client: OpenMeteoClient) {
      */
     fun observeStates(
         widgets: List<WidgetConfig>,
+        meteoFranceApiKey: String? = null,
         pollIntervalMs: Long = 5 * 60_000L
     ): Flow<Map<String, WidgetStateEntry>> = flow {
         val weatherWidgets = widgets.filter { it.source?.provider == "open-meteo" }
@@ -46,6 +49,12 @@ class WeatherRepository(private val client: OpenMeteoClient) {
                     val isForecast = widget.widgetType == WidgetType.FORECAST
                     val forecast = client.getForecast(lat, lon, forecastDays = if (isForecast) 7 else 1)
 
+                    val department = widget.source?.department
+                    var vigilanceResp: MeteoFranceVigilanceResponse? = null
+                    if (!department.isNullOrBlank() && !meteoFranceApiKey.isNullOrBlank()) {
+                        vigilanceResp = meteoFranceClient.getVigilance(department, meteoFranceApiKey)
+                    }
+
                     if (forecast != null) {
                         val state = if (isForecast) {
                             val days = buildForecastDays(forecast.daily, forecast.hourly)
@@ -54,6 +63,16 @@ class WeatherRepository(private val client: OpenMeteoClient) {
                         } else {
                             val current = forecast.current
                             val daily = forecast.daily
+
+                            val maxColor = vigilanceResp?.maxColorId
+                            val phenos = vigilanceResp?.phenomenonsMaxColor?.mapNotNull { p ->
+                                val pid = p.phenomenonId
+                                val cid = p.colorId
+                                if (pid != null && cid != null && cid > 1) {
+                                    VigilanceMapper.phenomenonName(pid) to cid
+                                } else null
+                            }.orEmpty()
+
                             WidgetLiveState.Weather(
                                 temperature = current?.temperature?.roundToInt() ?: 0,
                                 condition = WeatherCodeMapper.label(current?.weatherCode),
@@ -63,7 +82,11 @@ class WeatherRepository(private val client: OpenMeteoClient) {
                                 humidity = current?.humidity,
                                 windSpeed = current?.windSpeed,
                                 sunrise = daily?.sunrise?.firstOrNull()?.let { formatTimeLabel(it) },
-                                sunset = daily?.sunset?.firstOrNull()?.let { formatTimeLabel(it) }
+                                sunset = daily?.sunset?.firstOrNull()?.let { formatTimeLabel(it) },
+                                vigilanceLevel = maxColor,
+                                vigilanceColorName = VigilanceMapper.colorName(maxColor),
+                                vigilancePhenomenons = phenos,
+                                vigilanceDetails = vigilanceResp?.details.orEmpty()
                             )
                         }
                         lastStates[widget.id] = WidgetStateEntry(state = state, lastUpdate = System.currentTimeMillis())
@@ -137,4 +160,8 @@ class WeatherRepository(private val client: OpenMeteoClient) {
         val parsed = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.FRANCE).parse(isoDateTime) ?: return "--"
         SimpleDateFormat("HH:mm", Locale.FRANCE).format(parsed)
     }.getOrDefault("--")
+
+    fun close() {
+        meteoFranceClient.close()
+    }
 }

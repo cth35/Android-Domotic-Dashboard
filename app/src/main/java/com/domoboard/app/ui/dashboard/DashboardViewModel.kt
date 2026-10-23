@@ -150,9 +150,13 @@ class DashboardViewModel(
     private fun startWeatherPolling() {
         viewModelScope.launch {
             repository.configFlow
-                .map { cfg -> cfg.allWidgets().filter { it.source?.provider == "open-meteo" } }
+                .map { cfg ->
+                    val widgets = cfg.allWidgets().filter { it.source?.provider == "open-meteo" }
+                    val apiKey = cfg.settings.meteoFranceApiKey
+                    widgets to apiKey
+                }
                 .distinctUntilChanged()
-                .flatMapLatest { widgets -> weatherRepository.observeStates(widgets) }
+                .flatMapLatest { (widgets, apiKey) -> weatherRepository.observeStates(widgets, apiKey) }
                 .collect { states ->
                     weatherStates = states
                     publishMergedStates()
@@ -831,6 +835,7 @@ class DashboardViewModel(
         domoticzClient.close()
         domoticzWsClient.close()
         weatherClient.close()
+        weatherRepository.close()
     }
 }
 
