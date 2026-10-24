@@ -652,7 +652,7 @@ class DashboardViewModel(
 
     fun updateWidgetLabel(widgetId: String, newLabel: String) {
         val widget = repository.current().findWidget(widgetId)
-        updateWidgetConfig(widgetId, newLabel, widget?.backgroundColor, widget?.backgroundAlpha, widget?.source?.sensorMode)
+        updateWidgetConfig(widgetId, newLabel, widget?.backgroundColor, widget?.backgroundAlpha, widget?.source?.sensorMode, widget?.updateFlashEnabled)
     }
 
     fun updateWidgetConfig(
@@ -660,7 +660,8 @@ class DashboardViewModel(
         newLabel: String?,
         newBackgroundColor: String?,
         newBackgroundAlpha: Float?,
-        newSensorMode: String? = null
+        newSensorMode: String? = null,
+        newUpdateFlashEnabled: Boolean? = null
     ) {
         val current = repository.current()
         val pageIndex = current.pageIndexOf(widgetId) ?: return
@@ -678,7 +679,8 @@ class DashboardViewModel(
                     label = trimmedLabel,
                     backgroundColor = trimmedColor,
                     backgroundAlpha = newBackgroundAlpha,
-                    source = updatedSource
+                    source = updatedSource,
+                    updateFlashEnabled = newUpdateFlashEnabled
                 )
             } else {
                 widget

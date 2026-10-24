@@ -85,6 +85,7 @@ fun SettingsDialog(
     var nightBrightnessPercent by remember { mutableStateOf((initial.nightBrightness * 100).roundToInt().coerceIn(1, 100)) }
     var nightScreenOffEnabled by remember { mutableStateOf(initial.nightScreenOffEnabled) }
     var useRtspClientNative by remember { mutableStateOf(initial.useRtspClientNative) }
+    var widgetUpdateFlashEnabled by remember { mutableStateOf(initial.widgetUpdateFlashEnabled) }
     var isAdminActive by remember { mutableStateOf(ScreenPowerController.isDeviceAdminActive(context)) }
 
     val adminLauncher = rememberLauncherForActivityResult(
@@ -290,6 +291,21 @@ fun SettingsDialog(
                     )
 
                     Spacer(Modifier.height(24.dp))
+                    Text(text = "Animation des widgets", color = TextPrimary, fontSize = 16.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Effet de bordure néon lors de l'actualisation des valeurs des widgets.",
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    ToggleRow(
+                        label = "Activer l'effet flash néon global",
+                        checked = widgetUpdateFlashEnabled,
+                        onCheckedChange = { widgetUpdateFlashEnabled = it }
+                    )
+
+                    Spacer(Modifier.height(24.dp))
                     Text(text = "Gestion des pages", color = TextPrimary, fontSize = 16.sp)
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -380,7 +396,8 @@ fun SettingsDialog(
                                             nightEndHour = nightEndHour,
                                             nightBrightness = (nightBrightnessPercent / 100f).coerceIn(0.01f, 1f),
                                             nightScreenOffEnabled = nightScreenOffEnabled,
-                                            useRtspClientNative = useRtspClientNative
+                                            useRtspClientNative = useRtspClientNative,
+                                            widgetUpdateFlashEnabled = widgetUpdateFlashEnabled
                                         )
                                         ScreenPowerController.scheduleAlarms(context, newSettings)
                                         onSave(newSettings)

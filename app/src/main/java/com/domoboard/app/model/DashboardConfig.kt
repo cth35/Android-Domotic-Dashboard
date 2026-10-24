@@ -52,7 +52,10 @@ data class AppSettings(
     // --- Video Player ---
     // If true, uses rtsp-client-android (more reactive, low latency)
     // instead of libVLC (more stable on difficult streams).
-    val useRtspClientNative: Boolean = false
+    val useRtspClientNative: Boolean = false,
+
+    // --- Update Flash Animation ---
+    val widgetUpdateFlashEnabled: Boolean = false
 )
 
 @Serializable
@@ -80,7 +83,8 @@ data class WidgetConfig(
     val label: String? = null,
     val backgroundColor: String? = null,
     val backgroundAlpha: Float? = null,
-    val source: WidgetSource? = null
+    val source: WidgetSource? = null,
+    val updateFlashEnabled: Boolean? = null
 ) {
     val widgetType: WidgetType get() = WidgetType.fromRaw(type)
 }

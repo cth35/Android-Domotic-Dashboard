@@ -261,6 +261,12 @@ The repository includes a complete GitHub Actions workflow for automated buildin
 - Fetches 24-hour historical graph data from Domoticz (`param=graph`, supporting `sensor=Percentage`, `counter`, `general`, `temp`) and renders a smooth sparkline.
 - Fully dynamic: modifying the JSON configuration immediately triggers a data fetch without reloading the app.
 
+## Neon Update Flash Animation
+
+- Visual feedback when a widget value updates (via WebSocket, polling, or weather fetch): a glowing neon border matching the widget's configured background color fades out over 1.5 seconds.
+- **Global toggle**: `widgetUpdateFlashEnabled` in `AppSettings` (default `false`), adjustable from the Settings dialog.
+- **Per-widget toggle**: `updateFlashEnabled` in `WidgetConfig` (default `true`, overridden by the global toggle), adjustable from the Widget Customization dialog in edit mode.
+
 ## Domoticz interactions in the UI
 
 - **Light**: tap = toggle on/off.

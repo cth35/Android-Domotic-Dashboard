@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -109,6 +110,7 @@ fun WidgetCard(
     sparkline: List<Float>? = null,
     sunrise: String? = null,
     sunset: String? = null,
+    globalFlashEnabled: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     onShutterOpen: (() -> Unit)? = null,
@@ -130,10 +132,41 @@ fun WidgetCard(
         else -> SurfaceDark
     }
 
+    val widgetFlashEnabled = config.updateFlashEnabled ?: true
+    val isFlashEnabled = globalFlashEnabled && widgetFlashEnabled
+
+    var flashAlpha by remember { mutableStateOf(0f) }
+    val initialLastUpdate = remember { entry?.lastUpdate }
+
+    LaunchedEffect(entry?.lastUpdate) {
+        val currentUpdate = entry?.lastUpdate
+        if (isFlashEnabled && currentUpdate != null && currentUpdate != initialLastUpdate) {
+            flashAlpha = 1f
+            val startTime = System.currentTimeMillis()
+            val duration = 1500L
+            while (true) {
+                val elapsed = System.currentTimeMillis() - startTime
+                if (elapsed >= duration) {
+                    flashAlpha = 0f
+                    break
+                }
+                flashAlpha = (1f - (elapsed.toFloat() / duration)).coerceIn(0f, 1f)
+                kotlinx.coroutines.delay(16)
+            }
+        }
+    }
+
+    val glowColor = parseWidgetBackgroundColor(config.backgroundColor, 1f) ?: AccentBlue
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
+            .let {
+                if (flashAlpha > 0f) {
+                    it.border(2.dp, glowColor.copy(alpha = flashAlpha), RoundedCornerShape(12.dp))
+                } else it
+            }
             .let {
                 if (onClick != null || onLongClick != null) {
                     it.combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongClick)

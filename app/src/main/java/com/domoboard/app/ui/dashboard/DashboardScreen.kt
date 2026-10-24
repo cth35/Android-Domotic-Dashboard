@@ -180,6 +180,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                             sparkline = sparklines[widgetConfig.id],
                             sunrise = sunrise,
                             sunset = sunset,
+                            globalFlashEnabled = config.settings.widgetUpdateFlashEnabled,
                             onClick = when {
                                 isEditMode -> null
                                 widgetConfig.widgetType == WidgetType.WEATHER || widgetConfig.widgetType == WidgetType.FORECAST ->
@@ -416,9 +417,10 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
             currentLabel = widget.label ?: "",
             currentBackgroundColor = widget.backgroundColor,
             currentBackgroundAlpha = widget.backgroundAlpha,
+            currentUpdateFlashEnabled = widget.updateFlashEnabled,
             fallbackName = entry?.fallbackName,
-            onSave = { newLabel, newBgColor, newBgAlpha, newSensorMode ->
-                viewModel.updateWidgetConfig(widget.id, newLabel, newBgColor, newBgAlpha, newSensorMode)
+            onSave = { newLabel, newBgColor, newBgAlpha, newSensorMode, newUpdateFlashEnabled ->
+                viewModel.updateWidgetConfig(widget.id, newLabel, newBgColor, newBgAlpha, newSensorMode, newUpdateFlashEnabled)
                 renameWidgetTarget = null
             },
             onDismiss = { renameWidgetTarget = null }

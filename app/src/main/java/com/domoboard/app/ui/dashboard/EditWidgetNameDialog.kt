@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -78,14 +80,16 @@ fun EditWidgetNameDialog(
     currentLabel: String,
     currentBackgroundColor: String? = null,
     currentBackgroundAlpha: Float? = null,
+    currentUpdateFlashEnabled: Boolean? = null,
     fallbackName: String?,
-    onSave: (label: String, backgroundColor: String?, backgroundAlpha: Float?, sensorMode: String?) -> Unit,
+    onSave: (label: String, backgroundColor: String?, backgroundAlpha: Float?, sensorMode: String?, updateFlashEnabled: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     var labelText by remember { mutableStateOf(currentLabel) }
     var colorHexText by remember { mutableStateOf(currentBackgroundColor ?: "") }
     var alphaValue by remember { mutableFloatStateOf(currentBackgroundAlpha ?: 1.0f) }
     var sensorModeText by remember { mutableStateOf(currentSensorMode ?: "temp") }
+    var updateFlashEnabled by remember { mutableStateOf(currentUpdateFlashEnabled ?: true) }
     // Auto-expand the palette when the current color is a custom/non-quick one
     var showAllColors by remember {
         mutableStateOf(
@@ -405,6 +409,28 @@ fun EditWidgetNameDialog(
                     )
                 )
 
+                // --- Flash Animation ---
+                Spacer(Modifier.height(20.dp))
+                SectionLabel("Animation de mise à jour (Néon)")
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SurfaceVariantDark)
+                        .clickable { updateFlashEnabled = !updateFlashEnabled }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Effet flash néon", color = TextPrimary, fontSize = 14.sp)
+                    Switch(
+                        checked = updateFlashEnabled,
+                        onCheckedChange = { updateFlashEnabled = it },
+                        colors = SwitchDefaults.colors(checkedTrackColor = AccentBlue)
+                    )
+                }
+
                 Spacer(Modifier.height(12.dp))
             }
 
@@ -442,7 +468,8 @@ fun EditWidgetNameDialog(
                                 labelText,
                                 colorHexText.ifBlank { null },
                                 if (alphaValue < 0.99f) alphaValue else 1.0f,
-                                sensorModeText.ifBlank { "temp" }
+                                sensorModeText.ifBlank { "temp" },
+                                updateFlashEnabled
                             )
                         }
                         .padding(vertical = 13.dp),
