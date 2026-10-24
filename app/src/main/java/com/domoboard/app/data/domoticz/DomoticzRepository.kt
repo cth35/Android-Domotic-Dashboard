@@ -242,11 +242,9 @@ class DomoticzRepository(
         var rawPoints: List<DomoticzGraphPointDto>? = null
         for (st in sensorTypes) {
             rawPoints = client.getTempGraphDay(idx, st)
-            android.util.Log.d("DomoticzRepository", "Sparkline query idx=$idx sensor=$st -> result size: ${rawPoints?.size ?: 0}")
             if (!rawPoints.isNullOrEmpty()) break
         }
         if (rawPoints.isNullOrEmpty()) {
-            android.util.Log.w("DomoticzRepository", "Sparkline returned empty/null for idx=$idx across all sensor types")
             return null
         }
         

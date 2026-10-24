@@ -1,7 +1,7 @@
 package com.domoboard.app.server
 
 /**
- * Minimal editing page served on /: a simple JSON text editor.
+ * Minimal editing page served on /: a simple JSON text editor with line numbers and syntax highlighting.
  * Sufficient to validate the principle (reading, editing, saving);
  * a visual drag & drop editor on the browser side is conceivable later
  * but not necessary for now since tactile editing already
@@ -40,26 +40,57 @@ fun configEditorHtml(token: String): String = """
     border: 1px solid #2a2b2f;
     border-radius: 10px;
     overflow: hidden;
+    display: flex;
+  }
+
+  .line-numbers {
+    width: 55px;
+    background: #141518;
+    color: #565962;
+    padding: 16px 8px;
+    font-family: 'Fira Code', ui-monospace, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: right;
+    user-select: none;
+    box-sizing: border-box;
+    overflow: hidden;
+    border-right: 1px solid #2a2b2f;
+    flex-shrink: 0;
+    z-index: 2;
+  }
+
+  .editor-scroll {
+    position: relative;
+    flex-grow: 1;
+    height: 100%;
+    overflow: auto;
+  }
+
+  .editor-wrapper {
+    position: relative;
+    width: 100%;
+    min-height: 100%;
   }
   
   #editor, #highlighting {
     margin: 0;
     padding: 16px;
     width: 100%;
-    height: 100%;
+    min-height: 100%;
     font-family: 'Fira Code', ui-monospace, Menlo, Consolas, monospace;
     font-size: 13px;
     line-height: 1.5;
     box-sizing: border-box;
-    position: absolute;
-    top: 0;
-    left: 0;
     white-space: pre;
-    overflow: auto;
     tab-size: 2;
   }
 
   #editor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
     z-index: 1;
     color: transparent;
     background: transparent;
@@ -68,12 +99,16 @@ fun configEditorHtml(token: String): String = """
     border: none;
     outline: none;
     -webkit-text-fill-color: transparent;
+    overflow: hidden;
   }
 
   #highlighting {
+    position: relative;
     z-index: 0;
     color: #f2f2f0;
     pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   /* JSON Highlighting Colors */
@@ -111,8 +146,13 @@ fun configEditorHtml(token: String): String = """
   <p class="sub">Modifier le JSON puis "Enregistrer". Le dashboard se mettra à jour automatiquement sur l'appareil.</p>
   
   <div class="editor-container">
-    <pre id="highlighting" aria-hidden="true"></pre>
-    <textarea id="editor" spellcheck="false" oninput="updateView()" onscroll="syncScroll()"></textarea>
+    <div id="line-numbers" class="line-numbers">1</div>
+    <div class="editor-scroll" id="editorScroll" onscroll="syncScroll()">
+      <div class="editor-wrapper">
+        <pre id="highlighting" aria-hidden="true"></pre>
+        <textarea id="editor" spellcheck="false" oninput="updateView()"></textarea>
+      </div>
+    </div>
   </div>
 
   <div class="actions">
@@ -126,27 +166,32 @@ fun configEditorHtml(token: String): String = """
 const TOKEN = "$token";
 const editor = document.getElementById('editor');
 const highlighting = document.getElementById('highlighting');
+const lineNumbers = document.getElementById('line-numbers');
+const editorScroll = document.getElementById('editorScroll');
 
 function updateView() {
   const text = editor.value;
-  highlighting.innerHTML = highlight(text) + "\n"; // Adding newline to fix scroll sync at end
-  syncScroll();
+  highlighting.innerHTML = highlight(text) + "\n";
+  updateLineNumbers(text);
+}
+
+function updateLineNumbers(text) {
+  const lines = text.split('\n').length;
+  let numbers = [];
+  for (let i = 1; i <= lines; i++) {
+    numbers.push(i);
+  }
+  lineNumbers.innerHTML = numbers.join('<br>');
 }
 
 function syncScroll() {
-  highlighting.scrollTop = editor.scrollTop;
-  highlighting.scrollLeft = editor.scrollLeft;
+  lineNumbers.scrollTop = editorScroll.scrollTop;
 }
 
 function highlight(text) {
   // Escape HTML
   let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   
-  // Basic JSON highlighting via regex
-  // 1. Strings (including keys)
-  // 2. Numbers
-  // 3. Booleans/Null
-  // 4. Brackets/Braces
   return html.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?|[\[\]{}:,])/g, function (match) {
     let cls = '';
     if (/^"/.test(match)) {
@@ -180,12 +225,12 @@ function beautify() {
 }
 
 async function load() {
-  const res = await fetch('/config', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
-  if (!res.ok) {
+  const resObj = await fetch('/config', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+  if (!resObj.ok) {
     setStatus('Non autorisé (token invalide ?)', 'error');
     return;
   }
-  const text = await res.text();
+  const text = await resObj.text();
   try {
     const obj = JSON.parse(text);
     editor.value = JSON.stringify(obj, null, 2);
@@ -203,7 +248,7 @@ async function save() {
   try {
     JSON.parse(value);
   } catch (e) {
-    setStatus('JSON invalide : ' + e.message, 'error');
+    setStatus('JSON invalide : ' + e.content, 'error');
     return;
   }
   const res = await fetch('/config', {
