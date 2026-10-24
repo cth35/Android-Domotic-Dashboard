@@ -384,13 +384,24 @@ class DomoticzRepository(
             else -> null
         }
 
+        val rawData = device.Data?.trim() ?: "--"
+        val sensorUnit = device.SensorUnit?.trim()
+
+        val cleanData = if (!sensorUnit.isNullOrBlank()) {
+            val regex = Regex("(?i)\\s*${Regex.escape(sensorUnit)}\$")
+            rawData.replace(regex, "").trim()
+        } else {
+            rawData
+        }
+
         return WidgetLiveState.Sensor(
-            displayValue = device.Data ?: "--",
+            displayValue = cleanData.ifBlank { rawData },
             kind = kind,
             gaugePercent = gaugePercent,
             trend = mapTrend(device),
             tempValue = device.Temp,
-            humidityValue = device.Humidity
+            humidityValue = device.Humidity,
+            unit = sensorUnit
         )
     }
 }

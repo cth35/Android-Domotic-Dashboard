@@ -66,7 +66,8 @@ sealed class WidgetLiveState {
         val gaugePercent: Float? = null,
         val trend: Trend = Trend.STABLE,
         val tempValue: Double? = null,
-        val humidityValue: Double? = null
+        val humidityValue: Double? = null,
+        val unit: String? = null
     ) : WidgetLiveState()
 
     data class BinarySensor(

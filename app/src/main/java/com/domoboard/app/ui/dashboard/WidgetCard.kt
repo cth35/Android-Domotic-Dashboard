@@ -663,13 +663,12 @@ private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, 
         }
         else -> {
             val (v, u) = splitValueAndUnit(state?.displayValue ?: "--")
-            Triple(v, if (isTemp) "°" else u?.uppercase() ?: "", isTemp)
+            val resolvedUnit = state?.unit?.takeIf { it.isNotBlank() } ?: u
+            val unitForMain = if (resolvedUnit == "°" || resolvedUnit == "%") resolvedUnit else ""
+            Triple(v, unitForMain, isTemp)
         }
     }
 
-    // "both" mode: humidity sits under the unit sign ("°"), starting at its left edge.
-    // The "°" glyph is at the top of the line, so the space under it is free:
-    // the main value keeps the same font size whether humidity is shown or not.
     val humidityVal = state?.humidityValue
     val showBothHumidity = isTemp && sensorMode == "both" && humidityVal != null
 
@@ -686,55 +685,58 @@ private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, 
                 overflow = TextOverflow.Visible
             )
             // Unit + trend arrow (top row), humidity overlaid at the bottom-start
-            Box {
-                Row(
-                    verticalAlignment = if (showBothHumidity) Alignment.Top else Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = mainUnit,
-                        color = TextPrimary,
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Visible
-                    )
-                    if (showTrend) {
-                        state?.trend?.let {
-                            TrendArrow(
-                                it,
-                                Modifier.padding(
-                                    start = 4.dp,
-                                    top = if (showBothHumidity) 6.dp else 0.dp
-                                )
+            if (mainUnit.isNotBlank() || showTrend) {
+                Box {
+                    Row(
+                        verticalAlignment = if (showBothHumidity) Alignment.Top else Alignment.CenterVertically
+                    ) {
+                        if (mainUnit.isNotBlank()) {
+                            Text(
+                                text = mainUnit,
+                                color = TextPrimary,
+                                fontSize = 48.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Visible
                             )
                         }
+                        if (showTrend) {
+                            state?.trend?.let {
+                                TrendArrow(
+                                    it,
+                                    Modifier.padding(
+                                        start = 4.dp,
+                                        top = if (showBothHumidity) 6.dp else 0.dp
+                                    )
+                                )
+                            }
+                        }
                     }
-                }
-                if (showBothHumidity && humidityVal != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            // unbounded: never squeezed by the available width
-                            .wrapContentWidth(align = Alignment.Start, unbounded = true)
-                            .padding(bottom = 3.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.WaterDrop,
-                            contentDescription = null,
-                            tint = AccentBlueMuted,
-                            modifier = Modifier.size(11.dp)
-                        )
-                        Spacer(Modifier.width(2.dp))
-                        Text(
-                            text = "${humidityVal.toInt()}%",
-                            color = TextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            softWrap = false
-                        )
+                    if (showBothHumidity && humidityVal != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .wrapContentWidth(align = Alignment.Start, unbounded = true)
+                                .padding(bottom = 3.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.WaterDrop,
+                                contentDescription = null,
+                                tint = AccentBlueMuted,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                text = "${humidityVal.toInt()}%",
+                                color = TextSecondary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
                 }
             }
@@ -742,16 +744,18 @@ private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, 
 
         // Secondary display (unit label) when humidity is not shown in the right column
         if (!showBothHumidity) {
+            val (v, u) = splitValueAndUnit(state?.displayValue ?: "--")
+            val resolvedUnit = state?.unit?.takeIf { it.isNotBlank() } ?: u
             val kindUnit = when (state?.kind) {
-                SensorKind.TEMPERATURE -> "" // Displayed via mainUnit or handled above
+                SensorKind.TEMPERATURE -> ""
                 SensorKind.HUMIDITY -> "PERCENT"
-                else -> mainUnit.takeIf { it != "°" } ?: ""
+                else -> resolvedUnit?.uppercase() ?: ""
             }
-            if (kindUnit.isNotBlank()) {
+            if (kindUnit.isNotBlank() && kindUnit != "°" && kindUnit != "%") {
                 Text(
                     text = kindUnit,
                     color = TextSecondary,
-                    fontSize = 9.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
             }

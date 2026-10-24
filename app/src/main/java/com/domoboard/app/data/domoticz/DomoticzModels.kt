@@ -28,6 +28,7 @@ data class DomoticzDeviceDto(
     val Status: String? = null,
     // Raw value displayed by Domoticz (e.g., "21.5 C", "60 %")
     val Data: String? = null,
+    val SensorUnit: String? = null,
     // Position for shutters/dimmers (0-100)
     val Level: Int? = null,
     // Measured temperature (sensors, thermostats)
