@@ -391,7 +391,7 @@ private fun RelativeTimeBadge(lastUpdate: Long) {
 @Composable
 private fun WeatherContent(state: WidgetLiveState.Weather?) {
     val code = state?.weatherCode
-    val vigilanceLevel = state?.vigilanceLevel ?: 1
+    val vigilanceLevel = state?.vigilanceLevel
     val vigilanceColor = when (vigilanceLevel) {
         1 -> Color(0xFF4CAF50) // Green
         2 -> Color(0xFFFFEB3B) // Yellow
