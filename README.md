@@ -241,12 +241,25 @@ The repository includes a complete GitHub Actions workflow for automated buildin
 ## Weather client (Open-Meteo)
 
 - `data/weather/OpenMeteoClient.kt` — calls `https://api.open-meteo.com/v1/forecast` (free, no API key).
-- `data/weather/WeatherRepository.kt` — 15-minute polling interval.
+- `data/weather/WeatherRepository.kt` — 5-minute polling interval.
 - `data/weather/WeatherCodeMapper.kt` — translates WMO weather codes to French labels.
 
 ## 7-day forecast widget (FORECAST)
 
 - Displays 7-day forecast row via Open-Meteo with horizontally scrollable days.
+
+## Météo-France Vigilance Integration
+
+- `data/weather/MeteoFranceClient.kt` — fetches official Météo-France vigilance text bulletins (`/textesvigilance/encours`) using an API key (`meteoFranceApiKey` in global `AppSettings`).
+- Configurable per weather widget with the `department` field (e.g. `"department": "35"`).
+- Displays color-coded vigilance status (`Vig. Jaune`, `Vig. Orange`, etc.) directly on the weather card.
+- Tapping the weather card opens a scrollable details modal showing official Météo-France bulletin sections (*Faits nouveaux*, *Situation générale*) with validity time periods (`start_time` / `end_time`).
+
+## 24h Sparkline History Graphs
+
+- Supported on `THERMOSTAT` widgets and `SENSOR` widgets (explicitly enabled in JSON via `"showSparkline": true` in `WidgetSource`).
+- Fetches 24-hour historical graph data from Domoticz (`param=graph`, supporting `sensor=Percentage`, `counter`, `general`, `temp`) and renders a smooth sparkline.
+- Fully dynamic: modifying the JSON configuration immediately triggers a data fetch without reloading the app.
 
 ## Domoticz interactions in the UI
 

@@ -743,7 +743,7 @@ private fun SensorContent(config: WidgetConfig, state: WidgetLiveState.Sensor?, 
         }
 
         // Secondary display (unit label) when humidity is not shown in the right column
-        if (!showBothHumidity) {
+        if (!showBothHumidity && config.source?.showSparkline != true) {
             val (v, u) = splitValueAndUnit(state?.displayValue ?: "--")
             val resolvedUnit = state?.unit?.takeIf { it.isNotBlank() } ?: u
             val kindUnit = when (state?.kind) {

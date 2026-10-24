@@ -233,7 +233,22 @@ class DomoticzRepository(
      */
     suspend fun fetchTemperatureSparkline(widget: WidgetConfig, maxPoints: Int = 48): List<Float>? {
         val idx = extractIdx(widget) ?: return null
-        val rawPoints = client.getTempGraphDay(idx) ?: return null
+        val sensorTypes = if (widget.widgetType == WidgetType.SENSOR && widget.source?.showSparkline == true) {
+            listOf("Percentage", "percentage", "counter", "general", "temp", "pascals")
+        } else {
+            listOf("temp", "counter", "general")
+        }
+
+        var rawPoints: List<DomoticzGraphPointDto>? = null
+        for (st in sensorTypes) {
+            rawPoints = client.getTempGraphDay(idx, st)
+            android.util.Log.d("DomoticzRepository", "Sparkline query idx=$idx sensor=$st -> result size: ${rawPoints?.size ?: 0}")
+            if (!rawPoints.isNullOrEmpty()) break
+        }
+        if (rawPoints.isNullOrEmpty()) {
+            android.util.Log.w("DomoticzRepository", "Sparkline returned empty/null for idx=$idx across all sensor types")
+            return null
+        }
         
         val now = System.currentTimeMillis()
         val twentyFourHoursAgo = now - (24 * 3600 * 1000)
@@ -244,7 +259,7 @@ class DomoticzRepository(
             val time = runCatching { dateFormat.parse(it.d ?: "")?.time }.getOrNull()
             // If parsing fails, we keep the point for safety, otherwise we check the 24h
             if (time == null) true else time >= twentyFourHoursAgo
-        }.mapNotNull { it.te?.toFloatOrNull() }
+        }.mapNotNull { it.floatValue }
 
         if (points.isEmpty()) return null
         if (points.size <= maxPoints) return points

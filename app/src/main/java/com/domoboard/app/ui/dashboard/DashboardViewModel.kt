@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.domoboard.app.data.ConfigRepository
-import com.domoboard.app.data.SensorKind
 import com.domoboard.app.data.WidgetLiveState
 import com.domoboard.app.data.WidgetStateEntry
 import com.domoboard.app.data.camera.CameraRepository
@@ -372,28 +371,32 @@ class DashboardViewModel(
             // states) to respond before the first verification.
             delay(8_000L)
 
-            while (true) {
-                val eligibleWidgets = repository.current().allWidgets().filter { widget ->
-                    when (val state = _widgetStates.value[widget.id]?.state) {
-                        is WidgetLiveState.Sensor -> state.kind == SensorKind.TEMPERATURE
-                        is WidgetLiveState.Thermostat -> true
-                        else -> false
+            var pollingJob: Job? = null
+            repository.configFlow
+                .map { cfg ->
+                    cfg.allWidgets().filter { widget ->
+                        widget.widgetType == WidgetType.THERMOSTAT || widget.source?.showSparkline == true
                     }
                 }
-
-                if (eligibleWidgets.isNotEmpty()) {
-                    val updated = _sparklines.value.toMutableMap()
-                    for (widget in eligibleWidgets) {
-                        val points = domoticzRepository.fetchTemperatureSparkline(widget)
-                        if (points != null) {
-                            updated[widget.id] = points
+                .distinctUntilChanged()
+                .collect { eligibleWidgets ->
+                    pollingJob?.cancel()
+                    pollingJob = launch {
+                        while (true) {
+                            if (eligibleWidgets.isNotEmpty()) {
+                                val updated = _sparklines.value.toMutableMap()
+                                for (widget in eligibleWidgets) {
+                                    val points = domoticzRepository.fetchTemperatureSparkline(widget)
+                                    if (points != null) {
+                                        updated[widget.id] = points
+                                    }
+                                }
+                                _sparklines.value = updated
+                            }
+                            delay(10 * 60_000L)
                         }
                     }
-                    _sparklines.value = updated
                 }
-
-                delay(10 * 60_000L)
-            }
         }
     }
 

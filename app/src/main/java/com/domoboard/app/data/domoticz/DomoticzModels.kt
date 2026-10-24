@@ -76,8 +76,21 @@ data class DomoticzGraphResponse(
 @Serializable
 data class DomoticzGraphPointDto(
     val d: String? = null,
-    val te: String? = null
-)
+    val te: String? = null,
+    val v: String? = null,
+    val v1: String? = null,
+    val counter: String? = null,
+    val value: String? = null,
+    val percentage: String? = null
+) {
+    val floatValue: Float?
+        get() = te?.toFloatOrNull()
+            ?: v?.toFloatOrNull()
+            ?: v1?.toFloatOrNull()
+            ?: counter?.toFloatOrNull()
+            ?: value?.toFloatOrNull()
+            ?: percentage?.toFloatOrNull()
+}
 
 /**
  * Response from /json.htm?type=command&param=getscenes (since stable

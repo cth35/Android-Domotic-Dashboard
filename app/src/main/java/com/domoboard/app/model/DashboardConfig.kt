@@ -105,5 +105,6 @@ data class WidgetSource(
     val selectorLevels: List<Int>? = null, // List of levels to show (e.g. [10, 20])
     val selectorIcons: Map<String, String>? = null, // Level -> icon_name (snake_case)
     val showStatus: Boolean? = true,     // Whether to show the current level name
-    val highlightActive: Boolean? = true // Whether to highlight the currently active level
+    val highlightActive: Boolean? = true, // Whether to highlight the currently active level
+    val showSparkline: Boolean? = null   // Whether to show 24h sparkline graph on SENSOR widgets
 )

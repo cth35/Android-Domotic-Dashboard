@@ -138,11 +138,11 @@ class DomoticzClient(private val config: DomoticzConfig) {
      * Best-effort: returns null if the call fails or if the device does not
      * have temperature (e.g., non-temp sensor), rather than crashing.
      */
-    suspend fun getTempGraphDay(idx: String): List<DomoticzGraphPointDto>? = runCatching {
+    suspend fun getTempGraphDay(idx: String, sensor: String = "temp"): List<DomoticzGraphPointDto>? = runCatching {
         val response: DomoticzGraphResponse = httpClient.get("${config.baseUrl}/json.htm") {
             parameter("type", "command")
             parameter("param", "graph")
-            parameter("sensor", "temp")
+            parameter("sensor", sensor)
             parameter("idx", idx)
             parameter("range", "day")
         }.body()
